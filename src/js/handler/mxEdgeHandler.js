@@ -1552,6 +1552,7 @@ mxEdgeHandler.prototype.mouseMove = function(sender, me)
  */
 mxEdgeHandler.prototype.mouseUp = function(sender, me)
 {
+	console.log("mouseUp", sender, me);
 	// Workaround for wrong event source in Webkit
 	if (this.index != null && this.marker != null)
 	{
@@ -1581,6 +1582,7 @@ mxEdgeHandler.prototype.mouseUp = function(sender, me)
 			}
 			else if (index <= mxEvent.CUSTOM_HANDLE && index > mxEvent.VIRTUAL_HANDLE)
 			{
+				console.log("Custom Handle");
 				if (this.customHandles != null)
 				{
 					var model = this.graph.getModel();
@@ -1608,6 +1610,7 @@ mxEdgeHandler.prototype.mouseUp = function(sender, me)
 			}
 			else if (this.isSource || this.isTarget)
 			{
+				console.log("this.isSource || this.isTarget", this.isSource || this.isTarget);
 				var terminal = null;
 				
 				if (this.constraintHandler.currentConstraint != null &&

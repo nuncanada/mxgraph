@@ -1894,6 +1894,8 @@ mxConnectionHandler.prototype.getEdgeWidth = function(valid)
  */
 mxConnectionHandler.prototype.connect = function(source, target, evt, dropTarget)
 {
+	console.log(evt);
+	console.log(this.isCreateTarget(evt));
 	if (target != null || this.isCreateTarget(evt) || this.graph.allowDanglingEdges)
 	{
 		// Uses the common parent of source and target or

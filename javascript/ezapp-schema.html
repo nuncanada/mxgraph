@@ -161,6 +161,10 @@
 				// Does not allow dangling edges
 				graph.setAllowDanglingEdges(false);
 
+				//Achava que ia permitir fazer um Edge de uma Entidade para si mesma mas não funcionou
+				graph.setAllowLoops(true);
+				mxGraph.prototype.allowLoops = true;
+
 				// Forces use of default edge in mxConnectionHandler
 				graph.connectionHandler.factoryMethod = null;
 
