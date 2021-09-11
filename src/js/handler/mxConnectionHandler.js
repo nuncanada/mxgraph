@@ -607,7 +607,7 @@ mxConnectionHandler.prototype.createMarker = function()
 		else if (this.isConnecting() && !this.isCreateTarget(me.getEvent()) &&
 				!this.graph.allowDanglingEdges)
 		{
-			this.error = '';
+			this.error = 'isConnecting !isCreateTarget';
 		}
 
 		return cell;
@@ -725,6 +725,7 @@ mxConnectionHandler.prototype.isValidTarget = function(cell)
  */
 mxConnectionHandler.prototype.validateConnection = function(source, target)
 {
+	console.log("!this.isValidTarget(target)", !this.isValidTarget(target));
 	if (!this.isValidTarget(target))
 	{
 		return '';
@@ -1722,6 +1723,8 @@ mxConnectionHandler.prototype.checkConstraints = function(c1, c2)
  */
 mxConnectionHandler.prototype.mouseUp = function(sender, me)
 {
+	console.log('mxConnectionHandler.prototype.mouseUp', mxConnectionHandler.prototype.mouseUp);
+
 	if (!me.isConsumed() && this.isConnecting())
 	{
 		if (this.waypointsEnabled && !this.isStopEvent(me))
@@ -1737,18 +1740,18 @@ mxConnectionHandler.prototype.mouseUp = function(sender, me)
 
 		var source = (this.previous != null) ? this.previous.cell : null;
 		var target = null;
-		
+
 		if (this.constraintHandler.currentConstraint != null &&
 			this.constraintHandler.currentFocus != null)
 		{
 			target = this.constraintHandler.currentFocus.cell;
 		}
-		
+
 		if (target == null && this.currentState != null)
 		{
 			target = this.currentState.cell;
 		}
-		
+
 		// Inserts the edge if no validation error exists and if constraints differ
 		if (this.error == null && (source == null || target == null ||
 			source != target || this.checkConstraints(c1, c2)))

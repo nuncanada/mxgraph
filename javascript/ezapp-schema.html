@@ -6,31 +6,33 @@
 -->
 <html>
 <head>
-	<title>Schema example</title>
+    <title>EzApp Schema Editor</title>
 
-	<!-- Sets the basepath for the library if not in same directory -->
-	<script type="text/javascript">
+    <meta charset="UTF-8">
+
+    <!-- Sets the basepath for the library if not in same directory -->
+    <script type="text/javascript">
 		mxBasePath = '../src';
-	</script>
+    </script>
 
-	<!-- Loads and initializes the library -->
-	<script type="text/javascript" src="../src/js/mxClient.js"></script>
+    <!-- Loads and initializes the library -->
+    <script type="text/javascript" src="../src/js/mxClient.js"></script>
 
-	<!-- Example code -->
-	<script type="text/javascript">
+    <!-- Font Awesome -->
+    <link href="../src/fontawesome-5.15.4/css/all.css" rel="stylesheet">
+    <script defer type="text/javascript" src="../src/fontawesome-5.15.4/all.js"></script>
+
+    <!-- Example code -->
+    <script type="text/javascript">
 		// Program starts here. Creates a sample graph in the
 		// DOM node with the specified ID. This function is invoked
 		// from the onLoad event handler of the document (see below).
-		function main(container, outline, toolbar, sidebar, status)
-		{
+		function main (container, outline, toolbar, sidebar, status) {
 			// Checks if the browser is supported
-			if (!mxClient.isBrowserSupported())
-			{
+			if (!mxClient.isBrowserSupported()) {
 				// Displays an error message if the browser is not supported.
 				mxUtils.error('Browser is not supported!', 200, false);
-			}
-			else
-			{
+			} else {
 				//Achava que era o grid mas não é...
 				//mxGraphHandler.prototype.guidesEnabled = true;
 
@@ -40,14 +42,13 @@
 				mxConstants.SHADOW_OFFSET_X = 5;
 				mxConstants.SHADOW_OFFSET_Y = 6;
 
-				// Table icon dimensions and position
+				// Entity icon dimensions and position
 				mxSwimlane.prototype.imageSize = 20;
 				mxSwimlane.prototype.imageDx = 16;
 				mxSwimlane.prototype.imageDy = 4;
 
 				// Changes swimlane icon bounds
-				mxSwimlane.prototype.getImageBounds = function(x, y, w, h)
-				{
+				mxSwimlane.prototype.getImageBounds = function (x, y, w, h) {
 					return new mxRectangle(x + this.imageDx, y + this.imageDy, this.imageSize, this.imageSize);
 				};
 
@@ -59,73 +60,24 @@
 				/* Aqui inicia partes do Edge State antes do graph */
 
 				// Snaps to fixed points
-				mxConstraintHandler.prototype.intersects = function(icon, point, source, existingEdge)
-				{
+				mxConstraintHandler.prototype.intersects = function (icon, point, source, existingEdge) {
 					return (!source || existingEdge) || mxUtils.intersects(icon.bounds, point);
 				};
 
-				// Special case: Snaps source of new connections to fixed points
-				// Without a connect preview in connectionHandler.createEdgeState mouseMove
-				// and getSourcePerimeterPoint should be overriden by setting sourceConstraint
-				// sourceConstraint to null in mouseMove and updating it and returning the
-				// nearest point (cp) in getSourcePerimeterPoint (see below)
-				var mxConnectionHandlerUpdateEdgeState = mxConnectionHandler.prototype.updateEdgeState;
-				mxConnectionHandler.prototype.updateEdgeState = function(pt, constraint)
-				{
-					if (pt != null && this.previous != null)
-					{
-						var constraints = this.graph.getAllConnectionConstraints(this.previous);
-						var nearestConstraint = null;
-						var dist = null;
-
-						for (var i = 0; i < constraints.length; i++)
-						{
-							var cp = this.graph.getConnectionPoint(this.previous, constraints[i]);
-
-							if (cp != null)
-							{
-								var tmp = (cp.x - pt.x) * (cp.x - pt.x) + (cp.y - pt.y) * (cp.y - pt.y);
-
-								if (dist == null || tmp < dist)
-								{
-									nearestConstraint = constraints[i];
-									dist = tmp;
-								}
-							}
-						}
-
-						if (nearestConstraint != null)
-						{
-							this.sourceConstraint = nearestConstraint;
-						}
-
-						// In case the edge style must be changed during the preview:
-						// this.edgeState.style['edgeStyle'] = 'orthogonalEdgeStyle';
-						// And to use the new edge style in the new edge inserted into the graph,
-						// update the cell style as follows:
-						//this.edgeState.cell.style = mxUtils.setStyle(this.edgeState.cell.style, 'edgeStyle', this.edgeState.style['edgeStyle']);
-					}
-
-					mxConnectionHandlerUpdateEdgeState.apply(this, arguments);
-				};
-
-
-				/* Termina aqui Edge State */
 
 				// Prefetches all images that appear in colums
 				// to avoid problems with the auto-layout
-				var keyImage = new Image();
+				const keyImage = new Image();
 				keyImage.src = "images/key.png";
 
-				var plusImage = new Image();
+				const plusImage = new Image();
 				plusImage.src = "images/plus.png";
 
-				var checkImage = new Image();
+				const checkImage = new Image();
 				checkImage.src = "images/check.png";
 
 				// Workaround for Internet Explorer ignoring certain CSS directives
-				if (mxClient.IS_QUIRKS)
-				{
+				if (mxClient.IS_QUIRKS) {
 					document.body.style.overflow = 'hidden';
 					new mxDivResizer(container);
 					new mxDivResizer(outline);
@@ -138,9 +90,9 @@
 				// editor is used to create certain functionality for the
 				// graph, such as the rubberband selection, but most parts
 				// of the UI are custom in this example.
-				var editor = new mxEditor();
-				var graph = editor.graph;
-				var model = graph.model;
+				const editor = new mxEditor();
+				const graph = editor.graph;
+				const model = graph.model;
 
 				//Ativa o grid
 				graph.graphHandler.scaleGrid = true;
@@ -169,10 +121,8 @@
 				graph.connectionHandler.factoryMethod = null;
 
 				//Modificações Edge State
-				graph.getAllConnectionConstraints = function(terminal)
-				{
-					if (terminal != null && this.model.isVertex(terminal.cell))
-					{
+				graph.getAllConnectionConstraints = function (terminal) {
+					if (terminal != null && this.model.isVertex(terminal.cell)) {
 						return [
 							new mxConnectionConstraint(new mxPoint(0, 0), true),
 							new mxConnectionConstraint(new mxPoint(0.33, 0), true),
@@ -194,8 +144,7 @@
 
 				//Modificações Edge State
 				// Connect preview
-				graph.connectionHandler.createEdgeState = function(me)
-				{
+				graph.connectionHandler.createEdgeState = function (me) {
 					var edge = graph.createEdge(null, null, null, null, null, 'edgeStyle=orthogonalEdgeStyle');
 
 					return new mxCellState(this.graph.view, edge, this.graph.getCellStyle(edge));
@@ -204,24 +153,23 @@
 				// Enables rubberband selection
 				new mxRubberband(graph);
 
-				let mxConnectionHandlerInsertEdge = graph.connectionHandler.insertEdge;
-				graph.connectionHandler.insertEdge = function(parent, id, value, source, target, style)
-				{
-					value = {
-						source: source,
-						target: target,
-						isa: false,
-						forwardDescription: '',
-						backwardDescription: '',
-					};
-				  	return mxConnectionHandlerInsertEdge.apply(this, arguments);
-				};
-
 				let edgeStyle = graph.getStylesheet().getDefaultEdgeStyle();
 				console.log(edgeStyle);
 
 				// sidebar.js ->
 				// 	this.createEdgeTemplateEntry('shape=flexArrow;endArrow=classic;startArrow=classic;html=1;', 50, 50, '', 'Bidirectional Arrow', null, lineTags + 'bidirectional'),
+				/*
+                Sidebar.prototype.createEdgeTemplateEntry = function(style, width, height, value, title, showLabel, tags, allowCellsInserted)
+                {
+                    tags = (tags != null && tags.length > 0) ? tags : title.toLowerCase();
+
+                     return this.addEntry(tags, mxUtils.bind(this, function()
+                     {
+                         return this.createEdgeTemplate(style, width, height, value, title, showLabel, allowCellsInserted);
+                     }));
+                };
+                */
+
 
 				edgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.SegmentConnector;
 
@@ -233,35 +181,30 @@
 				//edgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
 
 				// Only tables are resizable
-				graph.isCellResizable = function(cell)
-				{
+				graph.isCellResizable = function (cell) {
 					return this.isSwimlane(cell);
 				};
 
 				// Only tables are movable
-				graph.isCellMovable = function(cell)
-				{
+				graph.isCellMovable = function (cell) {
 					return this.isSwimlane(cell);
 				};
 
 				// Sets the graph container and configures the editor
 				editor.setGraphContainer(container);
 				var config = mxUtils.load(
-					'editors/config/keyhandler-minimal.xml').
-						getDocumentElement();
+					'editors/config/keyhandler-minimal.xml').getDocumentElement();
 				editor.configure(config);
 
 				// Configures the automatic layout for the table columns
 				editor.layoutSwimlanes = true;
-				editor.createSwimlaneLayout = function ()
-				{
+				editor.createSwimlaneLayout = function () {
 					var layout = new mxStackLayout(this.graph, false);
 					layout.fill = true;
 					layout.resizeParent = true;
 
 					// Overrides the function to always return true
-					layout.isVertexMovable = function(cell)
-					{
+					layout.isVertexMovable = function (cell) {
 						return true;
 					};
 
@@ -269,14 +212,10 @@
 				};
 
 				// Text label changes will go into the name field of the user object
-				graph.model.valueForCellChanged = function(cell, value)
-				{
-					if (value.name != null)
-					{
+				graph.model.valueForCellChanged = function (cell, value) {
+					if (value.name != null) {
 						return mxGraphModel.prototype.valueForCellChanged.apply(this, arguments);
-					}
-					else
-					{
+					} else {
 						var old = cell.value.name;
 						cell.value.name = value;
 						return old;
@@ -284,23 +223,18 @@
 				};
 
 				// Columns are dynamically created HTML labels
-				graph.isHtmlLabel = function(cell)
-				{
-					return !this.isSwimlane(cell) &&
-						!this.model.isEdge(cell);
+				graph.isHtmlLabel = function (cell) {
+					return !this.isSwimlane(cell);
 				};
 
 				// Edges are not editable
-				graph.isCellEditable = function(cell)
-				{
+				graph.isCellEditable = function (cell) {
 					return !this.model.isEdge(cell);
 				};
 
 				// Returns the name field of the user object for the label
-				graph.convertValueToString = function(cell)
-				{
-					if (cell.value != null && cell.value.name != null)
-					{
+				graph.convertValueToString = function (cell) {
+					if (cell.value != null && cell.value.name != null) {
 						return cell.value.name;
 					}
 
@@ -308,67 +242,58 @@
 				};
 
 				// Returns the type as the tooltip for column cells
-				graph.getTooltip = function(state)
-				{
-					if (this.isHtmlLabel(state.cell))
-					{
-						return 'Type: '+state.cell.value.type;
-					}
-					else if (this.model.isEdge(state.cell))
-					{
-						return state.cell.source.value.name+' <-> '+state.cell.target.value.name;
+				graph.getTooltip = function (state) {
+					if (this.isHtmlLabel(state.cell)) {
+						return 'Type: ' + state.cell.value.type;
+					} else if (this.model.isEdge(state.cell)) {
+						return state.cell.source.value.name + ' <-> ' + state.cell.target.value.name;
 					}
 
 					return mxGraph.prototype.getTooltip.apply(this, arguments); // "supercall"
 				};
 
 				// Creates a dynamic HTML label for column fields
-				graph.getLabel = function(cell)
-				{
-					if (this.isHtmlLabel(cell))
-					{
-						var label = '';
+				graph.getLabel = function (cell) {
+					console.log(cell);
+					if (this.isHtmlLabel(cell)) {
+						if (cell.edge) {
+							if (cell.value.isa) {
+								//TODO: Probably it is better to change de style of the edge!
+								return '<div>IS A</div>';
+							} else {
+								//TODO: Would it look better if we align the arrows?
+								return '<div><div><i class="fas fa-arrow-right"></i>&nbsp;' +
+									cell.value.forwardDescription + ' </div> ' +
+									'<br/> ' +
+									'<div><i class="fas fa-arrow-left"></i>&nbsp;' +
+									cell.value.backwardDescription +
+									'</div></div>';
+							}
+						} else {
+							var label = '';
 
-						if (cell.value.primaryKey)
-						{
-							label += '<img title="Primary Key" src="images/key.png" width="16" height="16" align="top">&nbsp;';
-						}
-						else
-						{
-							label += '<img src="images/spacer.gif" width="16" height="1">&nbsp;';
-						}
+							if (cell.value.primaryKey) {
+								label += '<img title="Primary Key" src="images/key.png" width="16" height="16" align="top">&nbsp;';
+							} else {
+								label += '<img src="images/spacer.gif" width="16" height="1">&nbsp;';
+							}
 
-						if (cell.value.autoIncrement)
-						{
-							label += '<img title="Auto Increment" src="images/plus.png" width="16" height="16" align="top">&nbsp;';
+							return label + mxUtils.htmlEntities(cell.value.name, false) + ': ' +
+								mxUtils.htmlEntities(cell.value.type, false);
 						}
-						else if (cell.value.unique)
-						{
-							label += '<img title="Unique" src="images/check.png" width="16" height="16" align="top">&nbsp;';
-						}
-						else
-						{
-							label += '<img src="images/spacer.gif" width="16" height="1">&nbsp;';
-						}
-
-						return label + mxUtils.htmlEntities(cell.value.name, false) + ': ' +
-							mxUtils.htmlEntities(cell.value.type, false);
 					}
 
 					return mxGraph.prototype.getLabel.apply(this, arguments); // "supercall"
 				};
 
 				// Removes the source vertex if edges are removed
-				graph.addListener(mxEvent.REMOVE_CELLS, function(sender, evt)
-				{
+				graph.addListener(mxEvent.REMOVE_CELLS, function (sender, evt) {
 					var cells = evt.getProperty('cells');
 
-					for (var i = 0; i < cells.length; i++)
-					{
+					for (var i = 0; i < cells.length; i++) {
 						var cell = cells[i];
 
-						if (this.model.isEdge(cell))
-						{
+						if (this.model.isEdge(cell)) {
 							var terminal = this.model.getTerminal(cell, true);
 							var parent = this.model.getParent(terminal);
 							this.model.remove(terminal);
@@ -377,14 +302,12 @@
 				});
 
 				// Disables drag-and-drop into non-swimlanes.
-				graph.isValidDropTarget = function(cell, cells, evt)
-				{
+				graph.isValidDropTarget = function (cell, cells, evt) {
 					return this.isSwimlane(cell);
 				};
 
 				// Installs a popupmenu handler using local function (see below).
-				graph.popupMenuHandler.factoryMethod = function(menu, cell, evt)
-				{
+				graph.popupMenuHandler.factoryMethod = function (menu, cell, evt) {
 					createPopupMenu(editor, graph, menu, cell, evt);
 				};
 
@@ -392,11 +315,11 @@
 				configureStylesheet(graph);
 
 				// Adds sidebar icon for the table object
-				var tableObject = new Table('TABLENAME');
+				var tableObject = new Entity('ENITITYNAME');
 				var table = new mxCell(tableObject, new mxGeometry(0, 0, 200, 28), 'table');
 
 				table.setVertex(true);
-				addSidebarIcon(graph, sidebar, 	table, 'images/icons48/table.png');
+				addSidebarIcon(graph, sidebar, table, 'images/icons48/table.png');
 
 				// Adds sidebar icon for the column object
 				var columnObject = new Column('COLUMNNAME');
@@ -405,53 +328,38 @@
 				column.setVertex(true);
 				column.setConnectable(false);
 
-				addSidebarIcon(graph, sidebar, 	column, 'images/icons48/column.png');
+				addSidebarIcon(graph, sidebar, column, 'images/icons48/column.png');
+
+
+				//FIXME: Adicionar sumEllipse como opção para arrastar
+				//this.createVertexTemplateEntry('shape=sumEllipse;perimeter=ellipsePerimeter;whiteSpace=wrap;html=1;backgroundOutline=1;', 80, 80, '', 'Sum', null, null, 'sum circle oval ellipse');
 
 				// Adds primary key field into table
-				var firstColumn = column.clone();
+				const firstColumn = column.clone();
 
-				firstColumn.value.name = 'TABLENAME_ID';
-				firstColumn.value.type = 'INTEGER';
+				firstColumn.value.name = 'UUID';
+				firstColumn.value.type = 'UUID';
 				firstColumn.value.primaryKey = true;
-				firstColumn.value.autoIncrement = true;
 
 				table.insert(firstColumn);
 
 				// Adds child columns for new connections between tables
-				graph.addEdge = function(edge, parent, source, target, index)
-				{
+				graph.addEdge = function (edge, parent, source, target, index) {
 					this.model.beginUpdate();
-					try
-					{
-						edge.value = {
-							source: source,
-							target: target,
-							isa: false,
-							forwardDescription: '',
-							backwardDescription: '',
-						};
-						/*
-						var col1 = this.model.cloneCell(column);
-						col1.value.name = primaryKey.value.name;
-						col1.value.type = primaryKey.value.type;
-
-						this.addCell(col1, source);
-						source = col1;
-						target = primaryKey;
-						 */
-
+					try {
+						edge.value = new Relation(source, target);
 						return mxGraph.prototype.addEdge.apply(this, arguments); // "supercall"
-					}
-					finally
-					{
+					} finally {
 						this.model.endUpdate();
 					}
+
+					showRelationProperties(graph, edge);
 
 					return null;
 				};
 
 				// Displays useful hints in a small semi-transparent box.
-				var hints = document.createElement('div');
+				const hints = document.createElement('div');
 				hints.style.position = 'absolute';
 				hints.style.overflow = 'hidden';
 				hints.style.width = '230px';
@@ -477,27 +385,25 @@
 
 				// Creates a new DIV that is used as a toolbar and adds
 				// toolbar buttons.
-				var spacer = document.createElement('div');
+				const spacer = document.createElement('div');
 				spacer.style.display = 'inline';
 				spacer.style.padding = '8px';
 
 				addToolbarButton(editor, toolbar, 'properties', 'Properties', 'editors/images/properties.gif');
-
-				// Defines a new export action
-				editor.addAction('properties', function(editor, cell)
-				{
-					if (cell == null)
-					{
+				editor.addAction('properties', function (editor, cell) {
+					if (cell == null) {
 						cell = graph.getSelectionCell();
 					}
 
-					if (graph.isHtmlLabel(cell))
-					{
-						showEntityProperties(graph, cell);
-					}
+					console.log(cell);
 
-					if (graph.model.isEdge(cell)) {
-						showRelationProperties(graph, cell);
+					switch (cell.value.objectType) {
+						case ObjectType.COLUMN:
+							showColumnProperties(graph, cell);
+							break;
+						case ObjectType.RELATION:
+							showRelationProperties(graph, cell);
+							break;
 					}
 				});
 
@@ -516,8 +422,7 @@
 				toolbar.appendChild(spacer.cloneNode(true));
 
 				// Defines export XML action
-				editor.addAction('export', function(editor, cell)
-				{
+				editor.addAction('export', function (editor, cell) {
 					var textarea = document.createElement('textarea');
 					textarea.style.width = '400px';
 					textarea.style.height = '400px';
@@ -543,19 +448,15 @@
 
 				// Creates the outline (navigator, overview) for moving
 				// around the graph in the top, right corner of the window.
-				var outln = new mxOutline(graph, outline);
+				const outln = new mxOutline(graph, outline);
 
 				// Fades-out the splash screen after the UI has been loaded.
-				var splash = document.getElementById('splash');
-				if (splash != null)
-				{
-					try
-					{
+				const splash = document.getElementById('splash');
+				if (splash != null) {
+					try {
 						mxEvent.release(splash);
 						mxEffects.fadeOut(splash, 100, true);
-					}
-					catch (e)
-					{
+					} catch (e) {
 
 						// mxUtils is not available (library not loaded)
 						splash.parentNode.removeChild(splash);
@@ -564,12 +465,10 @@
 			}
 		}
 
-		function addToolbarButton(editor, toolbar, action, label, image, isTransparent)
-		{
-			var button = document.createElement('button');
+		function addToolbarButton (editor, toolbar, action, label, image, isTransparent) {
+			const button = document.createElement('button');
 			button.style.fontSize = '10';
-			if (image != null)
-			{
+			if (image != null) {
 				var img = document.createElement('img');
 				img.setAttribute('src', image);
 				img.style.width = '16px';
@@ -578,22 +477,19 @@
 				img.style.marginRight = '2px';
 				button.appendChild(img);
 			}
-			if (isTransparent)
-			{
+			if (isTransparent) {
 				button.style.background = 'transparent';
 				button.style.color = '#FFFFFF';
 				button.style.border = 'none';
 			}
-			mxEvent.addListener(button, 'click', function(evt)
-			{
+			mxEvent.addListener(button, 'click', function (evt) {
 				editor.execute(action);
 			});
 			mxUtils.write(button, label);
 			toolbar.appendChild(button);
-		};
+		}
 
-		function showModalWindow(title, content, width, height)
-		{
+		function showModalWindow (title, content, width, height) {
 			var background = document.createElement('div');
 			background.style.position = 'absolute';
 			background.style.left = '0px';
@@ -604,20 +500,18 @@
 			mxUtils.setOpacity(background, 50);
 			document.body.appendChild(background);
 
-			if (mxClient.IS_QUIRKS)
-			{
+			if (mxClient.IS_QUIRKS) {
 				new mxDivResizer(background);
 			}
 
-			var x = Math.max(0, document.body.scrollWidth/2-width/2);
-			var y = Math.max(10, (document.body.scrollHeight ||
-						document.documentElement.scrollHeight)/2-height*2/3);
-			var wnd = new mxWindow(title, content, x, y, width, height, false, true);
+			const x = Math.max(0, document.body.scrollWidth / 2 - width / 2);
+			const y = Math.max(10, (document.body.scrollHeight ||
+				document.documentElement.scrollHeight) / 2 - height * 2 / 3);
+			const wnd = new mxWindow(title, content, x, y, width, height, false, true);
 			wnd.setClosable(true);
 
 			// Fades the background out after after the window has been closed
-			wnd.addListener(mxEvent.DESTROY, function(evt)
-			{
+			wnd.addListener(mxEvent.DESTROY, function (evt) {
 				mxEffects.fadeOut(background, 50, true,
 					10, 30, true);
 			});
@@ -625,88 +519,82 @@
 			wnd.setVisible(true);
 
 			return wnd;
-		};
+		}
 
-		function addSidebarIcon(graph, sidebar, prototype, image)
-		{
+		function addSidebarIcon (graph, sidebar, prototype, image) {
 			// Function that is executed when the image is dropped on
 			// the graph. The cell argument points to the cell under
 			// the mousepointer if there is one.
-			var funct = function(graph, evt, cell)
-			{
+			var funct = function (graph, evt, cell) {
 				graph.stopEditing(false);
 
-				var pt = graph.getPointForEvent(evt);
+				const pt = graph.getPointForEvent(evt);
 
-				var parent = graph.getDefaultParent();
-				var model = graph.getModel();
+				let parent = graph.getDefaultParent();
+				const model = graph.getModel();
 
-				var isTable = graph.isSwimlane(prototype);
-				var name = null;
+				const isEntity = graph.isSwimlane(prototype);
+				let name = null;
 
-				if (!isTable)
-				{
-					parent = cell;
-					var pstate = graph.getView().getState(parent);
+				console.log(sidebar, prototype);
 
-					if (parent == null || pstate == null)
-					{
-						mxUtils.alert('Drop target must be a table');
-						return;
-					}
+				switch (prototype.value.objectType) {
+					case ObjectType.COLUMN:
+						parent = cell;
+						var pstate = graph.getView().getState(parent);
 
-					pt.x -= pstate.x;
-					pt.y -= pstate.y;
-
-					var columnCount = graph.model.getChildCount(parent)+1;
-					name = mxUtils.prompt('Enter name for new column', 'COLUMN'+columnCount);
-				}
-				else
-				{
-					var tableCount = 0;
-					var childCount = graph.model.getChildCount(parent);
-
-					for (var i=0; i<childCount; i++)
-					{
-						if (!graph.model.isEdge(graph.model.getChildAt(parent, i)))
-						{
-							tableCount++;
+						if (parent == null || pstate == null) {
+							mxUtils.alert('Drop target must be a table');
+							return;
 						}
-					}
 
-					var name = mxUtils.prompt('Enter name for new table', 'TABLE'+(tableCount+1));
+						pt.x -= pstate.x;
+						pt.y -= pstate.y;
+
+						var columnCount = graph.model.getChildCount(parent);
+						name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
+						break;
+					case ObjectType.ENTITY:
+						var tableCount = 0;
+						var childCount = graph.model.getChildCount(parent);
+
+						for (var i = 0; i < childCount; i++) {
+							if (!graph.model.isEdge(graph.model.getChildAt(parent, i))) {
+								tableCount++;
+							}
+						}
+
+						name = mxUtils.prompt('Enter name for new table', 'ENTITY ' + (tableCount + 1));
+						break;
+
+					case ObjectType.SUM:
 				}
 
-				if (name != null)
-				{
-					var v1 = model.cloneCell(prototype);
+				if (name != null) {
+					const v1 = model.cloneCell(prototype);
 
 					model.beginUpdate();
-					try
-					{
+					try {
 						v1.value.name = name;
 						v1.geometry.x = pt.x;
 						v1.geometry.y = pt.y;
 
 						graph.addCell(v1, parent);
 
-						if (isTable)
-						{
+						if (isEntity) {
 							v1.geometry.alternateBounds = new mxRectangle(0, 0, v1.geometry.width, v1.geometry.height);
-							v1.children[0].value.name = name + '_ID';
+							v1.children[0].value.name = 'ID';
 						}
-					}
-					finally
-					{
+					} finally {
 						model.endUpdate();
 					}
 
 					graph.setSelectionCell(v1);
 				}
-			}
+			};
 
 			// Creates the image which is used as the sidebar icon (drag source)
-			var img = document.createElement('img');
+			const img = document.createElement('img');
 			img.setAttribute('src', image);
 			img.style.width = '48px';
 			img.style.height = '48px';
@@ -714,41 +602,32 @@
 			sidebar.appendChild(img);
 
 			// Creates the image which is used as the drag icon (preview)
-			var dragImage = img.cloneNode(true);
-			var ds = mxUtils.makeDraggable(img, graph, funct, dragImage);
+			const dragImage = img.cloneNode(true);
+			const ds = mxUtils.makeDraggable(img, graph, funct, dragImage);
 
 			// Adds highlight of target tables for columns
 			ds.highlightDropTargets = true;
-			ds.getDropTarget = function(graph, x, y)
-			{
-				if (graph.isSwimlane(prototype))
-				{
+			ds.getDropTarget = function (graph, x, y) {
+				if (graph.isSwimlane(prototype)) {
 					return null;
-				}
-				else
-				{
+				} else {
 					var cell = graph.getCellAt(x, y);
 
-					if (graph.isSwimlane(cell))
-					{
+					if (graph.isSwimlane(cell)) {
 						return cell;
-					}
-					else
-					{
+					} else {
 						var parent = graph.getModel().getParent(cell);
 
-						if (graph.isSwimlane(parent))
-						{
+						if (graph.isSwimlane(parent)) {
 							return parent;
 						}
 					}
 				}
 			};
-		};
+		}
 
-		function configureStylesheet(graph)
-		{
-			var style = new Object();
+		function configureStylesheet (graph) {
+			let style = {};
 			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_RECTANGLE;
 			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
 			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_LEFT;
@@ -761,7 +640,7 @@
 			style[mxConstants.STYLE_IMAGE_HEIGHT] = '48';
 			graph.getStylesheet().putDefaultVertexStyle(style);
 
-			style = new Object();
+			style = {};
 			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
 			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
 			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
@@ -782,207 +661,249 @@
 			style[mxConstants.STYLE_SHADOW] = 1;
 			graph.getStylesheet().putCellStyle('table', style);
 
+			style = {};
+			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
+			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.EllipsePerimeter;
+			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
+			style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
+			style[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
+			style[mxConstants.STYLE_FILLCOLOR] = '#3ACDB4';
+			style[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
+			style[mxConstants.STYLE_STROKECOLOR] = '#1E33A6';
+			style[mxConstants.STYLE_FONTCOLOR] = '#000000';
+			style[mxConstants.STYLE_STROKEWIDTH] = '2';
+			style[mxConstants.STYLE_STARTSIZE] = '28';
+			style[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
+			style[mxConstants.STYLE_FONTSIZE] = '12';
+			style[mxConstants.STYLE_FONTSTYLE] = 1;
+			style[mxConstants.STYLE_IMAGE] = 'images/icons48/table.png';
+			// Looks better without opacity if shadow is enabled
+			//style[mxConstants.STYLE_OPACITY] = '80';
+			style[mxConstants.STYLE_SHADOW] = 1;
+			graph.getStylesheet().putCellStyle('sum', style);
+
 			style = graph.stylesheet.getDefaultEdgeStyle();
 			style[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
 			style[mxConstants.STYLE_STROKEWIDTH] = '2';
 			style[mxConstants.STYLE_ROUNDED] = true;
 			style[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
-		};
+		}
 
 		// Function to create the entries in the popupmenu
-		function createPopupMenu(editor, graph, menu, cell, evt)
-		{
+		function createPopupMenu (editor, graph, menu, cell, evt) {
 
 			console.log(editor, graph, menu, cell, evt);
 
-			if (cell != null)
-			{
-				if (graph.isHtmlLabel(cell) || graph.model.isEdge(cell))
-				{
-					menu.addItem('Properties', 'editors/images/properties.gif', function()
-					{
-						editor.execute('properties', cell);
-					});
-
-					menu.addSeparator();
+			if (cell != null) {
+				switch (cell.value.objectType) {
+					case ObjectType.RELATION:
+					case ObjectType.COLUMN:
+						menu.addItem('Properties', 'editors/images/properties.gif', function () {
+							editor.execute('properties', cell);
+						});
+						menu.addSeparator();
+						break;
 				}
 
-				menu.addItem('Delete', 'images/delete2.png', function()
-				{
+				menu.addItem('Delete', 'images/delete2.png', function () {
 					editor.execute('delete', cell);
 				});
 
 				menu.addSeparator();
 			}
 
-			menu.addItem('Undo', 'images/undo.png', function()
-			{
+			menu.addItem('Undo', 'images/undo.png', function () {
 				editor.execute('undo', cell);
 			});
 
-			menu.addItem('Redo', 'images/redo.png', function()
-			{
+			menu.addItem('Redo', 'images/redo.png', function () {
 				editor.execute('redo', cell);
 			});
 
 			//menu.addSeparator();
 
-		};
+		}
 
-		function showEntityProperties(graph, cell)
-		{
+		function showColumnProperties (graph, cell) {
 			// Creates a form for the user object inside
 			// the cell
-			var form = new mxForm('properties');
+			const form = new mxForm('properties');
 
 			// Adds a field for the columnname
-			var nameField = form.addText('Name', cell.value.name);
-			var typeField = form.addText('Type', cell.value.type);
+			const nameField = form.addText('Name', cell.value.name);
+			const typeField = form.addText('Type', cell.value.type);
 
-			var primaryKeyField = form.addCheckbox('Primary Key', cell.value.primaryKey);
-			var autoIncrementField = form.addCheckbox('Auto Increment', cell.value.autoIncrement);
-			var notNullField = form.addCheckbox('Not Null', cell.value.notNull);
-			var uniqueField = form.addCheckbox('Unique', cell.value.unique);
+			const notNullField = form.addCheckbox('Not Null', cell.value.notNull);
 
-			var defaultField = form.addText('Default', cell.value.defaultValue || '');
-			var useDefaultField = form.addCheckbox('Use Default', (cell.value.defaultValue != null));
+			const useDefaultField = form.addCheckbox('Use Default', (cell.value.defaultValue != null));
+			const defaultField = form.addText('Default', cell.value.defaultValue || '');
 
-			var wnd = null;
+			let wnd = null;
 
 			// Defines the function to be executed when the
 			// OK button is pressed in the dialog
-			var okFunction = function()
-			{
-				var clone = cell.value.clone();
+			const okFunction = function () {
+				const clone = cell.value.clone();
 
 				clone.name = nameField.value;
 				clone.type = typeField.value;
 
-				if (useDefaultField.checked)
-				{
+				if (useDefaultField.checked) {
 					clone.defaultValue = defaultField.value;
-				}
-				else
-				{
+				} else {
 					clone.defaultValue = null;
 				}
 
 				clone.primaryKey = primaryKeyField.checked;
-				clone.autoIncrement = autoIncrementField.checked;
 				clone.notNull = notNullField.checked;
-				clone.unique = uniqueField.checked;
 
 				graph.model.setValue(cell, clone);
 
 				wnd.destroy();
-			}
+			};
 
 			// Defines the function to be executed when the
 			// Cancel button is pressed in the dialog
-			var cancelFunction = function()
-			{
+			const cancelFunction = function () {
 				wnd.destroy();
-			}
+			};
 			form.addButtons(okFunction, cancelFunction);
 
-			var parent = graph.model.getParent(cell);
-			var name = parent.value.name + '.' + cell.value.name;
+			const parent = graph.model.getParent(cell);
+			if (cell.edge) {
+				let name = cell.value.source.name + '<->' + cell.value.target.name;
+			} else {
+				let name = parent.value.name + '.' + cell.value.name;
+			}
 			wnd = showModalWindow(name, form.table, 240, 240);
-		};
+		}
 
 
-		function showRelationProperties(graph, cell)
-		{
+		function showRelationProperties (graph, cell) {
 			// Creates a form for the user object inside
 			// the cell
 			//mxEditor.prototype.propertiesWidth = 240;
-			var form = new mxForm('properties');
+			const form = new mxForm('properties');
 
-			var isa = form.addCheckbox('IS A', cell.value.isa);
+			if (cell.source !== cell.target) {
+				const isa = form.addCheckbox('IS A', cell.value.isa);
 
-			console.log(isa);
+				isa.onchange = function () {
+					if (isa.checked) {
+						forwardDescription.disabled = true;
+						backwardDescription.disabled = true;
+						forwardDescription.value = 'IS A';
+						backwardDescription.value = '';
+					} else {
+						forwardDescription.disabled = false;
+						backwardDescription.disabled = false;
+						forwardDescription.value = '';
+						backwardDescription.value = '';
+					}
+				};
+			}
 
-			// Adds a field for the columnname
-			var forwardDescription = form.addText('Forward relation description', cell.value.forwardDescription);
-			var backwardDescription = form.addText('Backward relation description', cell.value.backwardDescription);
+			const forwardDescription = form.addText('Forward relation description', cell.value.forwardDescription);
+			const backwardDescription = form.addText('Backward relation description', cell.value.backwardDescription);
 
-			isa.onchange = function() {
-				if (isa.checked) {
-					forwardDescription.disabled  = true;
-					backwardDescription.disabled = true;
-					forwardDescription.value = 'IS A';
-					backwardDescription.value = '';
-				} else {
-					forwardDescription.disabled  = false;
-					backwardDescription.disabled = false;
-					forwardDescription.value = '';
-					backwardDescription.value = '';
-				}
-			};
+			if (cell.value.isa) {
+				forwardDescription.disabled = true;
+				backwardDescription.disabled = true;
+			}
 
-			var wnd = null;
+			let wnd = null;
 
 			// Defines the function to be executed when the
 			// OK button is pressed in the dialog
-			var okFunction = function()
-			{
-				var clone = cell.value.clone();
+			const okFunction = function () {
+				cell.value.forwardDescription = forwardDescription.value;
+				cell.value.backwardDescription = backwardDescription.value;
 
-				clone.forwardDescription = forwardDescription.value;
-				clone.backwardDescription = backwardDescription.value;
+				if (cell.source !== cell.target) {
+					cell.value.isa = isa.checked;
+				}
 
-				clone.isa = isa.checked;
+				console.log(graph);
+				console.log(cell);
 
-				graph.model.setValue(cell, clone);
+				//Quando mexe no gráfico. Queremos que já seja visualizada as modificações depois do OK
+				//Muito difícil de achar essas incantações mágicas nesse código do mxGraph...
+				const state = graph.view.getState(cell);
+				graph.cellRenderer.redraw(state);
 
 				wnd.destroy();
-			}
+			};
 
 			// Defines the function to be executed when the
 			// Cancel button is pressed in the dialog
-			var cancelFunction = function()
-			{
+			const cancelFunction = function () {
 				wnd.destroy();
-			}
+			};
 			form.addButtons(okFunction, cancelFunction);
 
 			wnd = showModalWindow('Relation properties', form.table, 320, 200);
+		}
+
+		const ObjectType = {
+			"ENTITY": 1,
+			"COLUMN": 2,
+			"RELATION": 3,
+			"SUM": 4
 		};
 
 		// Defines the column user object
-		function Column(name)
-		{
+		function Column (name) {
 			this.name = name;
-		};
+			this.type = 'TEXT';
+			this.defaultValue = null;
+			this.notNull = false;
+			this.objectType = ObjectType.COLUMN;
+		}
 
-		Column.prototype.type = 'TEXT';
-
-		Column.prototype.defaultValue = null;
-
-		Column.prototype.primaryKey = false;
-
-		Column.prototype.autoIncrement = false;
-
-		Column.prototype.notNull = false;
-
-		Column.prototype.unique = false;
-
-		Column.prototype.clone = function()
-		{
+		Column.prototype.clone = function () {
 			return mxUtils.clone(this);
 		};
 
 		// Defines the table user object
-		function Table(name)
-		{
+		function Entity (name) {
 			this.name = name;
-		};
+			this.objectType = ObjectType.ENTITY;
+		}
 
-		Table.prototype.clone = function()
-		{
+		Entity.prototype.clone = function () {
 			return mxUtils.clone(this);
 		};
-	</script>
+
+		function Relation (source, target) {
+			this.source = source;
+			this.target = target;
+			this.backwardDescription = '';
+			this.forwardDescription = '';
+			this.isa = false;
+			this.objectType = ObjectType.RELATION;
+		}
+
+		Relation.prototype.clone = function () {
+			const clone = new Relation(this.source, this.target);
+			clone.backwardDescription = this.backwardDescription;
+			clone.forwardDescription = this.forwardDescription;
+			clone.isa = this.isa;
+			clone.objectType = this.objectType;
+
+			return clone;
+		};
+
+		// Defines the table user object
+		function Sum (name) {
+			this.name = name;
+			this.objectType = ObjectType.SUM;
+		}
+
+		Entity.prototype.clone = function () {
+			return mxUtils.clone(this);
+		};
+
+    </script>
 </head>
 
 <!-- Page passes the container for the graph to the program -->
@@ -992,40 +913,41 @@
 			document.getElementById('sidebarContainer'),
 			document.getElementById('statusContainer'));">
 
-	<!-- Creates a container for the splash screen -->
-	<div id="splash"
-		style="position:absolute;top:0px;left:0px;width:100%;height:100%;background:white;z-index:1;">
-		<center style="padding-top:230px;">
-			<img src="editors/images/loading.gif">
-		</center>
-	</div>
+<!-- Creates a container for the splash screen -->
+<div id="splash"
+     style="position:absolute;top:0px;left:0px;width:100%;height:100%;background:white;z-index:1;">
+    <center style="padding-top:230px;">
+        <img src="editors/images/loading.gif">
+    </center>
+</div>
 
-	<!-- Creates a container for the sidebar -->
-	<div id="toolbarContainer"
-		style="position:absolute;white-space:nowrap;overflow:hidden;top:0px;left:0px;max-height:24px;height:36px;right:0px;padding:6px;background-image:url('images/toolbar_bg.gif');">
-	</div>
+<!-- Creates a container for the sidebar -->
+<div id="toolbarContainer"
+     style="position:absolute;white-space:nowrap;overflow:hidden;top:0px;left:0px;max-height:24px;height:36px;right:0px;padding:6px;background-image:url('images/toolbar_bg.gif');">
+</div>
 
-	<!-- Creates a container for the toolboox -->
-	<div id="sidebarContainer"
-		style="position:absolute;overflow:hidden;top:36px;left:0px;bottom:36px;max-width:52px;width:56px;padding-top:10px;padding-left:4px;background-image:url('images/sidebar_bg.gif');">
-	</div>
+<!-- Creates a container for the toolboox -->
+<div id="sidebarContainer"
+     style="position:absolute;overflow:hidden;top:36px;left:0px;bottom:36px;max-width:52px;width:56px;padding-top:10px;padding-left:4px;background-image:url('images/sidebar_bg.gif');">
+</div>
 
-	<!-- Creates a container for the graph -->
-	<div id="graphContainer"
-		style="position:absolute;overflow:hidden;top:36px;left:60px;bottom:36px;right:0px;">
-	</div>
+<!-- Creates a container for the graph -->
+<div id="graphContainer"
+     style="position:absolute;overflow:hidden;top:36px;left:60px;bottom:36px;right:0px;">
+</div>
 
-	<!-- Creates a container for the outline -->
-	<div id="outlineContainer"
-		style="position:absolute;overflow:hidden;top:36px;right:0px;width:200px;height:140px;background:transparent;border-style:solid;border-color:black;">
-	</div>
+<!-- Creates a container for the outline -->
+<div id="outlineContainer"
+     style="position:absolute;overflow:hidden;top:36px;right:0px;width:200px;height:140px;background:transparent;border-style:solid;border-color:black;">
+</div>
 
-	<!-- Creates a container for the sidebar -->
-	<div id="statusContainer"
-		style="text-align:right;position:absolute;overflow:hidden;bottom:0px;left:0px;max-height:24px;height:36px;right:0px;color:white;padding:6px;background-image:url('images/toolbar_bg.gif');">
-		<div style="font-size:10pt;float:left;">
-			Created with <a href="http://www.jgraph.com" target="_blank">mxGraph</a>
-		</div>
-	</div>
+<!-- Creates a container for the sidebar -->
+<div id="statusContainer"
+     style="text-align:right;position:absolute;overflow:hidden;bottom:0px;left:0px;max-height:24px;height:36px;right:0px;color:white;padding:6px;background-image:url('images/toolbar_bg.gif');">
+    <div style="font-size:10pt;float:left;">
+        Created with <a href="http://www.jgraph.com" target="_blank">mxGraph</a>
+    </div>
+</div>
+
 </body>
 </html>
