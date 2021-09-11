@@ -286,21 +286,6 @@
 					return mxGraph.prototype.getLabel.apply(this, arguments); // "supercall"
 				};
 
-				// Removes the source vertex if edges are removed
-				graph.addListener(mxEvent.REMOVE_CELLS, function (sender, evt) {
-					var cells = evt.getProperty('cells');
-
-					for (var i = 0; i < cells.length; i++) {
-						var cell = cells[i];
-
-						if (this.model.isEdge(cell)) {
-							var terminal = this.model.getTerminal(cell, true);
-							var parent = this.model.getParent(terminal);
-							this.model.remove(terminal);
-						}
-					}
-				});
-
 				// Disables drag-and-drop into non-swimlanes.
 				graph.isValidDropTarget = function (cell, cells, evt) {
 					return this.isSwimlane(cell);
@@ -314,12 +299,19 @@
 				// Adds all required styles to the graph (see below)
 				configureStylesheet(graph);
 
-				// Adds sidebar icon for the table object
-				var tableObject = new Entity('ENITITYNAME');
-				var table = new mxCell(tableObject, new mxGeometry(0, 0, 200, 28), 'table');
 
-				table.setVertex(true);
-				addSidebarIcon(graph, sidebar, table, 'images/icons48/table.png');
+				var abstractEntityObject = new AbstractEntity('ABSTRACTENTITYNAME');
+				var abstractEntity = new mxCell(abstractEntityObject, new mxGeometry(0, 0, 200, 28), 'abstractEntity');
+
+				abstractEntity.setVertex(true);
+				addSidebarIcon(graph, sidebar, abstractEntity, 'images/icons48/abstract_entity.png');
+
+
+				var entityObject = new Entity('ENTITYNAME');
+				var entity = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), 'entity');
+
+				entity.setVertex(true);
+				addSidebarIcon(graph, sidebar, entity, 'images/icons48/entity.png');
 
 				// Adds sidebar icon for the column object
 				var columnObject = new Column('COLUMNNAME');
@@ -341,7 +333,8 @@
 				firstColumn.value.type = 'UUID';
 				firstColumn.value.primaryKey = true;
 
-				table.insert(firstColumn);
+				entity.insert(firstColumn.clone());
+				abstractEntity.insert(firstColumn.clone());
 
 				// Adds child columns for new connections between tables
 				graph.addEdge = function (edge, parent, source, target, index) {
@@ -541,7 +534,7 @@
 				switch (prototype.value.objectType) {
 					case ObjectType.COLUMN:
 						parent = cell;
-						var pstate = graph.getView().getState(parent);
+						const pstate = graph.getView().getState(parent);
 
 						if (parent == null || pstate == null) {
 							mxUtils.alert('Drop target must be a table');
@@ -551,23 +544,26 @@
 						pt.x -= pstate.x;
 						pt.y -= pstate.y;
 
-						var columnCount = graph.model.getChildCount(parent);
+						const columnCount = graph.model.getChildCount(parent);
 						name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
 						break;
 					case ObjectType.ENTITY:
-						var tableCount = 0;
-						var childCount = graph.model.getChildCount(parent);
+						let tableCount = 0;
+						const childCount = graph.model.getChildCount(parent);
 
-						for (var i = 0; i < childCount; i++) {
-							if (!graph.model.isEdge(graph.model.getChildAt(parent, i))) {
+						for (let i = 0; i < childCount; i++) {
+							console.log(graph.model.getChildAt(parent, i));
+							if (graph.model.getChildAt(parent, i).value.objectType === ObjectType.ENTITY) {
 								tableCount++;
 							}
 						}
 
-						name = mxUtils.prompt('Enter name for new table', 'ENTITY ' + (tableCount + 1));
+						name = mxUtils.prompt('Enter name for new entity', 'ENTITY ' + (tableCount + 1));
 						break;
 
-					case ObjectType.SUM:
+					case ObjectType.ABSTRACT_ENTITY:
+						name = mxUtils.prompt('Enter name for new abstract entity', 'NEW ABSTRACT ENTITY');
+						break;
 				}
 
 				if (name != null) {
@@ -581,7 +577,9 @@
 
 						graph.addCell(v1, parent);
 
-						if (isEntity) {
+						console.log("[ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType");
+						console.log([ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType));
+						if ([ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType)) {
 							v1.geometry.alternateBounds = new mxRectangle(0, 0, v1.geometry.width, v1.geometry.height);
 							v1.children[0].value.name = 'ID';
 						}
@@ -655,19 +653,19 @@
 			style[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
 			style[mxConstants.STYLE_FONTSIZE] = '12';
 			style[mxConstants.STYLE_FONTSTYLE] = 1;
-			style[mxConstants.STYLE_IMAGE] = 'images/icons48/table.png';
+			style[mxConstants.STYLE_IMAGE] = 'images/icons48/entity.png';
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
 			style[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('table', style);
+			graph.getStylesheet().putCellStyle('entity', style);
 
 			style = {};
 			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
-			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.EllipsePerimeter;
+			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
 			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
 			style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
-			style[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
-			style[mxConstants.STYLE_FILLCOLOR] = '#3ACDB4';
+			style[mxConstants.STYLE_GRADIENTCOLOR] = '#33C1A3';
+			style[mxConstants.STYLE_FILLCOLOR] = '#9A33EE';
 			style[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
 			style[mxConstants.STYLE_STROKECOLOR] = '#1E33A6';
 			style[mxConstants.STYLE_FONTCOLOR] = '#000000';
@@ -676,11 +674,11 @@
 			style[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
 			style[mxConstants.STYLE_FONTSIZE] = '12';
 			style[mxConstants.STYLE_FONTSTYLE] = 1;
-			style[mxConstants.STYLE_IMAGE] = 'images/icons48/table.png';
+			style[mxConstants.STYLE_IMAGE] = 'images/icons48/abstract_entity.png';
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
 			style[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('sum', style);
+			graph.getStylesheet().putCellStyle('abstractEntity', style);
 
 			style = graph.stylesheet.getDefaultEdgeStyle();
 			style[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
@@ -770,6 +768,7 @@
 			form.addButtons(okFunction, cancelFunction);
 
 			const parent = graph.model.getParent(cell);
+			console.log(cell);
 			if (cell.edge) {
 				let name = cell.value.source.name + '<->' + cell.value.target.name;
 			} else {
@@ -848,7 +847,7 @@
 			"ENTITY": 1,
 			"COLUMN": 2,
 			"RELATION": 3,
-			"SUM": 4
+			"ABSTRACT_ENTITY": 4
 		};
 
 		// Defines the column user object
@@ -874,6 +873,16 @@
 			return mxUtils.clone(this);
 		};
 
+		// Defines the table user object
+		function AbstractEntity (name) {
+			this.name = name;
+			this.objectType = ObjectType.ABSTRACT_ENTITY;
+		}
+
+		AbstractEntity.prototype.clone = function () {
+			return mxUtils.clone(this);
+		};
+
 		function Relation (source, target) {
 			this.source = source;
 			this.target = target;
@@ -893,15 +902,6 @@
 			return clone;
 		};
 
-		// Defines the table user object
-		function Sum (name) {
-			this.name = name;
-			this.objectType = ObjectType.SUM;
-		}
-
-		Entity.prototype.clone = function () {
-			return mxUtils.clone(this);
-		};
 
     </script>
 </head>
