@@ -607,7 +607,7 @@ mxConnectionHandler.prototype.createMarker = function()
 		else if (this.isConnecting() && !this.isCreateTarget(me.getEvent()) &&
 				!this.graph.allowDanglingEdges)
 		{
-			this.error = 'isConnecting !isCreateTarget';
+			this.error = '';
 		}
 
 		return cell;
