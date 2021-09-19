@@ -3,6 +3,14 @@
 
   Schema example for mxGraph. This example demonstrates implementing
   a SQL schema editor.
+
+  IMPLEMENT:
+  - constraints
+  - virtual properties/columns
+  - align arrows in relationship edge
+  - UUID generate IDs to track entities and relationships
+  - Button apply changes
+
 -->
 <html>
 <head>
@@ -56,14 +64,10 @@
 				// This will automatically disable the highlighting of the source vertex.
 				mxConnectionHandler.prototype.connectImage = new mxImage('images/connector.gif', 16, 16);
 
-
-				/* Aqui inicia partes do Edge State antes do graph */
-
 				// Snaps to fixed points
 				mxConstraintHandler.prototype.intersects = function (icon, point, source, existingEdge) {
 					return (!source || existingEdge) || mxUtils.intersects(icon.bounds, point);
 				};
-
 
 				// Prefetches all images that appear in colums
 				// to avoid problems with the auto-layout
@@ -76,15 +80,6 @@
 				const checkImage = new Image();
 				checkImage.src = "images/check.png";
 
-				// Workaround for Internet Explorer ignoring certain CSS directives
-				if (mxClient.IS_QUIRKS) {
-					document.body.style.overflow = 'hidden';
-					new mxDivResizer(container);
-					new mxDivResizer(outline);
-					new mxDivResizer(toolbar);
-					new mxDivResizer(sidebar);
-					new mxDivResizer(status);
-				}
 
 				// Creates the graph inside the given container. The
 				// editor is used to create certain functionality for the
@@ -154,22 +149,6 @@
 				new mxRubberband(graph);
 
 				let edgeStyle = graph.getStylesheet().getDefaultEdgeStyle();
-				console.log(edgeStyle);
-
-				// sidebar.js ->
-				// 	this.createEdgeTemplateEntry('shape=flexArrow;endArrow=classic;startArrow=classic;html=1;', 50, 50, '', 'Bidirectional Arrow', null, lineTags + 'bidirectional'),
-				/*
-                Sidebar.prototype.createEdgeTemplateEntry = function(style, width, height, value, title, showLabel, tags, allowCellsInserted)
-                {
-                    tags = (tags != null && tags.length > 0) ? tags : title.toLowerCase();
-
-                     return this.addEntry(tags, mxUtils.bind(this, function()
-                     {
-                         return this.createEdgeTemplate(style, width, height, value, title, showLabel, allowCellsInserted);
-                     }));
-                };
-                */
-
 
 				edgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.SegmentConnector;
 
@@ -177,7 +156,6 @@
 				//No nosso caso queremos 2 labels, um de ida, outro para a volta
 				edgeStyle[mxConstants.STYLE_NOLABEL] = true;
 
-				console.log(edgeStyle);
 				//edgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
 
 				// Only tables are resizable
@@ -258,10 +236,10 @@
 					if (this.isHtmlLabel(cell)) {
 						if (cell.edge) {
 							if (cell.value.isa) {
-								//TODO: Probably it is better to change de style of the edge!
+								//FIXME: Probably it is better to change de style of the edge!
 								return '<div>IS A</div>';
 							} else {
-								//TODO: Would it look better if we align the arrows?
+								//FIXME: Would look better if we align the arrows
 								return '<div><div><i class="fas fa-arrow-right"></i>&nbsp;' +
 									cell.value.forwardDescription + ' </div> ' +
 									'<br/> ' +
@@ -300,43 +278,20 @@
 				configureStylesheet(graph);
 
 
-				var abstractEntityObject = new AbstractEntity('ABSTRACTENTITYNAME');
-				var abstractEntity = new mxCell(abstractEntityObject, new mxGeometry(0, 0, 200, 28), 'abstractEntity');
-
-				abstractEntity.setVertex(true);
-				addSidebarIcon(graph, sidebar, abstractEntity, 'images/icons48/abstract_entity.png');
-
-
-				var entityObject = new Entity('ENTITYNAME');
-				var entity = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), 'entity');
-
-				entity.setVertex(true);
-				addSidebarIcon(graph, sidebar, entity, 'images/icons48/entity.png');
-
-				// Adds sidebar icon for the column object
-				var columnObject = new Column('COLUMNNAME');
-				var column = new mxCell(columnObject, new mxGeometry(0, 0, 0, 26));
-
-				column.setVertex(true);
-				column.setConnectable(false);
-
-				addSidebarIcon(graph, sidebar, column, 'images/icons48/column.png');
-
-
-				//FIXME: Adicionar sumEllipse como opção para arrastar
-				//this.createVertexTemplateEntry('shape=sumEllipse;perimeter=ellipsePerimeter;whiteSpace=wrap;html=1;backgroundOutline=1;', 80, 80, '', 'Sum', null, null, 'sum circle oval ellipse');
 
 				// Adds primary key field into table
-				const firstColumn = column.clone();
+				const firstColumn = ColumnManager.createColumn('ID');
 
-				firstColumn.value.name = 'UUID';
+				//firstColumn.value.name = 'UUID';
 				firstColumn.value.type = 'UUID';
 				firstColumn.value.primaryKey = true;
 
-				entity.insert(firstColumn.clone());
-				abstractEntity.insert(firstColumn.clone());
+				addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/entity.png');
+				addSidebarIcon(graph, sidebar, ObjectType.ABSTRACT_ENTITY, 'images/icons48/abstract_entity.png');
+				addSidebarIcon(graph, sidebar, ObjectType.COLUMN, 'images/icons48/column.png');
 
-				// Adds child columns for new connections between tables
+				console.log(Column);
+
 				graph.addEdge = function (edge, parent, source, target, index) {
 					this.model.beginUpdate();
 					try {
@@ -346,7 +301,8 @@
 						this.model.endUpdate();
 					}
 
-					showRelationProperties(graph, edge);
+					const manager = ManagerFactory.createManager(Relation);
+					manager.openPopupToEditProperties(graph, edge);
 
 					return null;
 				};
@@ -388,16 +344,15 @@
 						cell = graph.getSelectionCell();
 					}
 
-					console.log(cell);
-
-					switch (cell.value.objectType) {
-						case ObjectType.COLUMN:
-							showColumnProperties(graph, cell);
-							break;
-						case ObjectType.RELATION:
-							showRelationProperties(graph, cell);
-							break;
-					}
+					console.log(cell.value);
+					console.log(cell.value.constructor);
+					console.log(cell.value.constructor.name);
+					console.log(typeof cell.value);
+					const manager = ManagerFactory.createManager(cell.value.constructor);
+					console.log(manager);
+					if (manager.hasEditableProperties()) {
+						manager.openPopupToEditProperties(graph, cell);
+                    }
 				});
 
 				addToolbarButton(editor, toolbar, 'delete', 'Delete', 'images/delete2.png');
@@ -514,81 +469,33 @@
 			return wnd;
 		}
 
-		function addSidebarIcon (graph, sidebar, prototype, image) {
+		function addSidebarIcon (graph, sidebar, sidebarObjectType, image) {
+
 			// Function that is executed when the image is dropped on
 			// the graph. The cell argument points to the cell under
 			// the mousepointer if there is one.
-			var funct = function (graph, evt, cell) {
+			const imageDroppedOnGraphFunction = function (graph, event, cell) {
+				console.log(graph, event, cell);
 				graph.stopEditing(false);
 
-				const pt = graph.getPointForEvent(evt);
+				const eventPoint = graph.getPointForEvent(event);
 
 				let parent = graph.getDefaultParent();
 				const model = graph.getModel();
 
-				const isEntity = graph.isSwimlane(prototype);
 				let name = null;
 
-				console.log(sidebar, prototype);
+				model.beginUpdate();
+				try {
+					console.log(sidebarObjectType);
+					const manager = ManagerFactory.createManager(sidebarObjectType);
+					console.log(manager);
+    				const newCell = manager.insertNewObject(graph, event, cell);
+					graph.setSelectionCell(newCell);
+                } finally {
+                    model.endUpdate();
+                }
 
-				switch (prototype.value.objectType) {
-					case ObjectType.COLUMN:
-						parent = cell;
-						const pstate = graph.getView().getState(parent);
-
-						if (parent == null || pstate == null) {
-							mxUtils.alert('Drop target must be a table');
-							return;
-						}
-
-						pt.x -= pstate.x;
-						pt.y -= pstate.y;
-
-						const columnCount = graph.model.getChildCount(parent);
-						name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
-						break;
-					case ObjectType.ENTITY:
-						let tableCount = 0;
-						const childCount = graph.model.getChildCount(parent);
-
-						for (let i = 0; i < childCount; i++) {
-							console.log(graph.model.getChildAt(parent, i));
-							if (graph.model.getChildAt(parent, i).value.objectType === ObjectType.ENTITY) {
-								tableCount++;
-							}
-						}
-
-						name = mxUtils.prompt('Enter name for new entity', 'ENTITY ' + (tableCount + 1));
-						break;
-
-					case ObjectType.ABSTRACT_ENTITY:
-						name = mxUtils.prompt('Enter name for new abstract entity', 'NEW ABSTRACT ENTITY');
-						break;
-				}
-
-				if (name != null) {
-					const v1 = model.cloneCell(prototype);
-
-					model.beginUpdate();
-					try {
-						v1.value.name = name;
-						v1.geometry.x = pt.x;
-						v1.geometry.y = pt.y;
-
-						graph.addCell(v1, parent);
-
-						console.log("[ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType");
-						console.log([ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType));
-						if ([ObjectType.ENTITY, ObjectType.ABSTRACT_ENTITY].includes(prototype.value.objectType)) {
-							v1.geometry.alternateBounds = new mxRectangle(0, 0, v1.geometry.width, v1.geometry.height);
-							v1.children[0].value.name = 'ID';
-						}
-					} finally {
-						model.endUpdate();
-					}
-
-					graph.setSelectionCell(v1);
-				}
 			};
 
 			// Creates the image which is used as the sidebar icon (drag source)
@@ -601,90 +508,117 @@
 
 			// Creates the image which is used as the drag icon (preview)
 			const dragImage = img.cloneNode(true);
-			const ds = mxUtils.makeDraggable(img, graph, funct, dragImage);
+			const ds = mxUtils.makeDraggable(img, graph, imageDroppedOnGraphFunction, dragImage);
 
 			// Adds highlight of target tables for columns
 			ds.highlightDropTargets = true;
 			ds.getDropTarget = function (graph, x, y) {
-				if (graph.isSwimlane(prototype)) {
+				console.log(sidebarObjectType);
+				if (sidebarObjectType === ObjectType.ENTITY) {
 					return null;
-				} else {
-					var cell = graph.getCellAt(x, y);
-
-					if (graph.isSwimlane(cell)) {
-						return cell;
-					} else {
-						var parent = graph.getModel().getParent(cell);
-
-						if (graph.isSwimlane(parent)) {
-							return parent;
-						}
-					}
 				}
+
+                const cell = graph.getCellAt(x, y);
+				console.log(cell);
+                if (cell && cell.value && cell.value.objectType === ObjectType.ENTITY) {
+					console.log(cell.value.objectType, cell.value);
+                    return cell;
+                }
+
+                const cellParent = graph.getModel().getParent(cell);
+                if (cellParent && cellParent.value && cellParent.value.objectType === ObjectType.ENTITY) {
+					console.log(cellParent.value, cellParent.value.objectType);
+                    return cellParent;
+                }
+
+                return null;
 			};
 		}
 
 		function configureStylesheet (graph) {
-			let style = {};
-			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_RECTANGLE;
-			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
-			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_LEFT;
-			style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_MIDDLE;
-			style[mxConstants.STYLE_FONTCOLOR] = '#000000';
-			style[mxConstants.STYLE_FONTSIZE] = '11';
-			style[mxConstants.STYLE_FONTSTYLE] = 0;
-			style[mxConstants.STYLE_SPACING_LEFT] = '4';
-			style[mxConstants.STYLE_IMAGE_WIDTH] = '48';
-			style[mxConstants.STYLE_IMAGE_HEIGHT] = '48';
-			graph.getStylesheet().putDefaultVertexStyle(style);
+			let vertexStyle = {};
+			vertexStyle[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_RECTANGLE;
+			vertexStyle[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
+			vertexStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_LEFT;
+			vertexStyle[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_MIDDLE;
+			vertexStyle[mxConstants.STYLE_FONTCOLOR] = '#000000';
+			vertexStyle[mxConstants.STYLE_FONTSIZE] = '11';
+			vertexStyle[mxConstants.STYLE_FONTSTYLE] = 0;
+			vertexStyle[mxConstants.STYLE_SPACING_LEFT] = '4';
+			vertexStyle[mxConstants.STYLE_IMAGE_WIDTH] = '48';
+			vertexStyle[mxConstants.STYLE_IMAGE_HEIGHT] = '48';
+			graph.getStylesheet().putDefaultVertexStyle(vertexStyle);
 
-			style = {};
-			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
-			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
-			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
-			style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
-			style[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
-			style[mxConstants.STYLE_FILLCOLOR] = '#8CCDF5';
-			style[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
-			style[mxConstants.STYLE_STROKECOLOR] = '#1B78C8';
-			style[mxConstants.STYLE_FONTCOLOR] = '#000000';
-			style[mxConstants.STYLE_STROKEWIDTH] = '2';
-			style[mxConstants.STYLE_STARTSIZE] = '28';
-			style[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
-			style[mxConstants.STYLE_FONTSIZE] = '12';
-			style[mxConstants.STYLE_FONTSTYLE] = 1;
-			style[mxConstants.STYLE_IMAGE] = 'images/icons48/entity.png';
+			let entityStyle = {};
+			entityStyle[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
+			entityStyle[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
+			entityStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
+			entityStyle[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
+			entityStyle[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
+			entityStyle[mxConstants.STYLE_FILLCOLOR] = '#8CCDF5';
+			entityStyle[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
+			entityStyle[mxConstants.STYLE_STROKECOLOR] = '#1B78C8';
+			entityStyle[mxConstants.STYLE_FONTCOLOR] = '#000000';
+			entityStyle[mxConstants.STYLE_STROKEWIDTH] = '2';
+			entityStyle[mxConstants.STYLE_STARTSIZE] = '28';
+			entityStyle[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
+			entityStyle[mxConstants.STYLE_FONTSIZE] = '12';
+			entityStyle[mxConstants.STYLE_FONTSTYLE] = 1;
+			entityStyle[mxConstants.STYLE_IMAGE] = 'images/icons48/entity.png';
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
-			style[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('entity', style);
+			entityStyle[mxConstants.STYLE_SHADOW] = 1;
+			graph.getStylesheet().putCellStyle('entity', entityStyle);
 
-			style = {};
-			style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
-			style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
-			style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
-			style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
-			style[mxConstants.STYLE_GRADIENTCOLOR] = '#33C1A3';
-			style[mxConstants.STYLE_FILLCOLOR] = '#9A33EE';
-			style[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
-			style[mxConstants.STYLE_STROKECOLOR] = '#1E33A6';
-			style[mxConstants.STYLE_FONTCOLOR] = '#000000';
-			style[mxConstants.STYLE_STROKEWIDTH] = '2';
-			style[mxConstants.STYLE_STARTSIZE] = '28';
-			style[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
-			style[mxConstants.STYLE_FONTSIZE] = '12';
-			style[mxConstants.STYLE_FONTSTYLE] = 1;
-			style[mxConstants.STYLE_IMAGE] = 'images/icons48/abstract_entity.png';
+
+			let entityLaneStyle = {};
+			entityLaneStyle[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
+			entityLaneStyle[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
+			entityLaneStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
+			entityLaneStyle[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
+			entityLaneStyle[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
+			entityLaneStyle[mxConstants.STYLE_FILLCOLOR] = '#8CCDF5';
+			entityLaneStyle[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
+			entityLaneStyle[mxConstants.STYLE_STROKECOLOR] = '#1B78C8';
+			entityLaneStyle[mxConstants.STYLE_FONTCOLOR] = '#000000';
+			entityLaneStyle[mxConstants.STYLE_STROKEWIDTH] = '2';
+			entityLaneStyle[mxConstants.STYLE_STARTSIZE] = '28';
+			entityLaneStyle[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
+			entityLaneStyle[mxConstants.STYLE_FONTSIZE] = '12';
+			entityLaneStyle[mxConstants.STYLE_FONTSTYLE] = 1;
+			//entityLaneStyle[mxConstants.STYLE_IMAGE] = 'images/icons48/entity.png';
+			// Looks better without opacity if shadow is enabled
+			entityLaneStyle[mxConstants.STYLE_OPACITY] = '80';
+			//entityLaneStyle[mxConstants.STYLE_SHADOW] = 1;
+			graph.getStylesheet().putCellStyle('entityLane', entityLaneStyle);
+
+
+			let abstractEntityStyle = {};
+			abstractEntityStyle[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_SWIMLANE;
+			abstractEntityStyle[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
+			abstractEntityStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
+			abstractEntityStyle[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
+			abstractEntityStyle[mxConstants.STYLE_GRADIENTCOLOR] = '#33C1A3';
+			abstractEntityStyle[mxConstants.STYLE_FILLCOLOR] = '#9A33EE';
+			abstractEntityStyle[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
+			abstractEntityStyle[mxConstants.STYLE_STROKECOLOR] = '#1E33A6';
+			abstractEntityStyle[mxConstants.STYLE_FONTCOLOR] = '#000000';
+			abstractEntityStyle[mxConstants.STYLE_STROKEWIDTH] = '2';
+			abstractEntityStyle[mxConstants.STYLE_STARTSIZE] = '28';
+			abstractEntityStyle[mxConstants.STYLE_VERTICAL_ALIGN] = 'middle';
+			abstractEntityStyle[mxConstants.STYLE_FONTSIZE] = '12';
+			abstractEntityStyle[mxConstants.STYLE_FONTSTYLE] = 1;
+			abstractEntityStyle[mxConstants.STYLE_IMAGE] = 'images/icons48/abstract_entity.png';
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
-			style[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('abstractEntity', style);
+			abstractEntityStyle[mxConstants.STYLE_SHADOW] = 1;
+			graph.getStylesheet().putCellStyle('abstractEntity', abstractEntityStyle);
 
-			style = graph.stylesheet.getDefaultEdgeStyle();
-			style[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
-			style[mxConstants.STYLE_STROKEWIDTH] = '2';
-			style[mxConstants.STYLE_ROUNDED] = true;
-			style[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
+			let defaultEdgeStyle = graph.stylesheet.getDefaultEdgeStyle();
+			defaultEdgeStyle[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
+			defaultEdgeStyle[mxConstants.STYLE_STROKEWIDTH] = '2';
+			defaultEdgeStyle[mxConstants.STYLE_ROUNDED] = true;
+			defaultEdgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
 		}
 
 		// Function to create the entries in the popupmenu
@@ -693,15 +627,12 @@
 			console.log(editor, graph, menu, cell, evt);
 
 			if (cell != null) {
-				switch (cell.value.objectType) {
-					case ObjectType.RELATION:
-					case ObjectType.COLUMN:
-						menu.addItem('Properties', 'editors/images/properties.gif', function () {
-							editor.execute('properties', cell);
-						});
-						menu.addSeparator();
-						break;
-				}
+				if (ManagerFactory.createManager(cell.value).hasEditableProperties()) {
+					menu.addItem('Properties', 'editors/images/properties.gif', function () {
+						editor.execute('properties', cell);
+					});
+					menu.addSeparator();
+                }
 
 				menu.addItem('Delete', 'images/delete2.png', function () {
 					editor.execute('delete', cell);
@@ -722,186 +653,349 @@
 
 		}
 
-		function showColumnProperties (graph, cell) {
-			// Creates a form for the user object inside
-			// the cell
-			const form = new mxForm('properties');
-
-			// Adds a field for the columnname
-			const nameField = form.addText('Name', cell.value.name);
-			const typeField = form.addText('Type', cell.value.type);
-
-			const notNullField = form.addCheckbox('Not Null', cell.value.notNull);
-
-			const useDefaultField = form.addCheckbox('Use Default', (cell.value.defaultValue != null));
-			const defaultField = form.addText('Default', cell.value.defaultValue || '');
-
-			let wnd = null;
-
-			// Defines the function to be executed when the
-			// OK button is pressed in the dialog
-			const okFunction = function () {
-				const clone = cell.value.clone();
-
-				clone.name = nameField.value;
-				clone.type = typeField.value;
-
-				if (useDefaultField.checked) {
-					clone.defaultValue = defaultField.value;
-				} else {
-					clone.defaultValue = null;
-				}
-
-				clone.primaryKey = primaryKeyField.checked;
-				clone.notNull = notNullField.checked;
-
-				graph.model.setValue(cell, clone);
-
-				wnd.destroy();
-			};
-
-			// Defines the function to be executed when the
-			// Cancel button is pressed in the dialog
-			const cancelFunction = function () {
-				wnd.destroy();
-			};
-			form.addButtons(okFunction, cancelFunction);
-
-			const parent = graph.model.getParent(cell);
-			console.log(cell);
-			if (cell.edge) {
-				let name = cell.value.source.name + '<->' + cell.value.target.name;
-			} else {
-				let name = parent.value.name + '.' + cell.value.name;
-			}
-			wnd = showModalWindow(name, form.table, 240, 240);
-		}
-
-
-		function showRelationProperties (graph, cell) {
-			// Creates a form for the user object inside
-			// the cell
-			//mxEditor.prototype.propertiesWidth = 240;
-			const form = new mxForm('properties');
-
-			if (cell.source !== cell.target) {
-				const isa = form.addCheckbox('IS A', cell.value.isa);
-
-				isa.onchange = function () {
-					if (isa.checked) {
-						forwardDescription.disabled = true;
-						backwardDescription.disabled = true;
-						forwardDescription.value = 'IS A';
-						backwardDescription.value = '';
-					} else {
-						forwardDescription.disabled = false;
-						backwardDescription.disabled = false;
-						forwardDescription.value = '';
-						backwardDescription.value = '';
-					}
-				};
-			}
-
-			const forwardDescription = form.addText('Forward relation description', cell.value.forwardDescription);
-			const backwardDescription = form.addText('Backward relation description', cell.value.backwardDescription);
-
-			if (cell.value.isa) {
-				forwardDescription.disabled = true;
-				backwardDescription.disabled = true;
-			}
-
-			let wnd = null;
-
-			// Defines the function to be executed when the
-			// OK button is pressed in the dialog
-			const okFunction = function () {
-				cell.value.forwardDescription = forwardDescription.value;
-				cell.value.backwardDescription = backwardDescription.value;
-
-				if (cell.source !== cell.target) {
-					cell.value.isa = isa.checked;
-				}
-
-				console.log(graph);
-				console.log(cell);
-
-				//Quando mexe no gráfico. Queremos que já seja visualizada as modificações depois do OK
-				//Muito difícil de achar essas incantações mágicas nesse código do mxGraph...
-				const state = graph.view.getState(cell);
-				graph.cellRenderer.redraw(state);
-
-				wnd.destroy();
-			};
-
-			// Defines the function to be executed when the
-			// Cancel button is pressed in the dialog
-			const cancelFunction = function () {
-				wnd.destroy();
-			};
-			form.addButtons(okFunction, cancelFunction);
-
-			wnd = showModalWindow('Relation properties', form.table, 320, 200);
-		}
-
 		const ObjectType = {
 			"ENTITY": 1,
 			"COLUMN": 2,
 			"RELATION": 3,
-			"ABSTRACT_ENTITY": 4
+			"ABSTRACT_ENTITY": 4,
+            "LANE": 5
 		};
 
-		// Defines the column user object
-		function Column (name) {
-			this.name = name;
-			this.type = 'TEXT';
-			this.defaultValue = null;
-			this.notNull = false;
-			this.objectType = ObjectType.COLUMN;
+		class ColumnManager {
+
+			static createColumn(name) {
+				// Adds sidebar icon for the column object
+				const columnObject = new Column(name);
+				const columnCell = new mxCell(columnObject, new mxGeometry(0, 0, 0, 26));
+
+				columnCell.setVertex(true);
+				columnCell.setConnectable(false);
+
+				return columnCell;
+			}
+
+			hasEditableProperties() {
+				return true;
+			}
+
+			openPopupToEditProperties(graph, cell) {
+				const form = new mxForm('properties');
+
+				// Adds a field for the columnname
+				const nameField = form.addText('Name', cell.value.name);
+				const typeField = form.addText('Type', cell.value.type);
+
+				const notNullField = form.addCheckbox('Not Null', cell.value.notNull);
+
+				const useDefaultField = form.addCheckbox('Use Default', (cell.value.defaultValue != null));
+				const defaultField = form.addText('Default', cell.value.defaultValue || '');
+
+				let wnd = null;
+
+				// Defines the function to be executed when the
+				// OK button is pressed in the dialog
+				const okFunction = function () {
+					const clone = cell.value.clone();
+
+					clone.name = nameField.value;
+					clone.type = typeField.value;
+
+					if (useDefaultField.checked) {
+						clone.defaultValue = defaultField.value;
+					} else {
+						clone.defaultValue = null;
+					}
+
+					clone.primaryKey = primaryKeyField.checked;
+					clone.notNull = notNullField.checked;
+
+					graph.model.setValue(cell, clone);
+
+					wnd.destroy();
+				};
+
+				// Defines the function to be executed when the
+				// Cancel button is pressed in the dialog
+				const cancelFunction = function () {
+					wnd.destroy();
+				};
+				form.addButtons(okFunction, cancelFunction);
+
+				const parent = graph.model.getParent(cell);
+				console.log(cell);
+				if (cell.edge) {
+					let name = cell.value.source.name + '<->' + cell.value.target.name;
+				} else {
+					let name = parent.value.name + '.' + cell.value.name;
+				}
+				wnd = showModalWindow(name, form.table, 240, 240);
+			}
+
+		    insertNewObject(graph, event, targetCell) {
+				const eventPoint = graph.getPointForEvent(event);
+				const model = graph.getModel();
+
+				const parentState = graph.getView().getState(targetCell);
+				console.log(targetCell, parentState);
+				if (targetCell == null || parentState == null) {
+					mxUtils.alert('Drop target must be a table');
+					return;
+				}
+
+				eventPoint.x -= parentState.x;
+				eventPoint.y -= parentState.y;
+
+				const columnCount = graph.model.getChildCount(targetCell);
+				const name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
+
+				if (name != null) {
+					const newColumnCell = ColumnManager.createColumn(name);
+
+					newColumnCell.geometry.x = eventPoint.x;
+					newColumnCell.geometry.y = eventPoint.y;
+
+					graph.addCell(newColumnCell, targetCell);
+				}
+
+            }
 		}
 
-		Column.prototype.clone = function () {
-			return mxUtils.clone(this);
-		};
+		class RelationManager {
+			hasEditableProperties() {
+				return true;
+			}
 
-		// Defines the table user object
-		function Entity (name) {
-			this.name = name;
-			this.objectType = ObjectType.ENTITY;
+			openPopupToEditProperties(graph, cell) {
+				// Creates a form for the user object inside
+				// the cell
+				//mxEditor.prototype.propertiesWidth = 240;
+				const form = new mxForm('properties');
+				let isa = null;
+
+				if (cell.source !== cell.target) {
+					isa = form.addCheckbox('IS A', cell.value.isa);
+
+					isa.onchange = function () {
+						if (isa.checked) {
+							forwardDescription.disabled = true;
+							backwardDescription.disabled = true;
+							forwardDescription.value = 'IS A';
+							backwardDescription.value = '';
+						} else {
+							forwardDescription.disabled = false;
+							backwardDescription.disabled = false;
+							forwardDescription.value = '';
+							backwardDescription.value = '';
+						}
+					};
+				}
+
+				const forwardDescription = form.addText('Forward relation description', cell.value.forwardDescription);
+				const backwardDescription = form.addText('Backward relation description', cell.value.backwardDescription);
+
+				if (cell.value.isa) {
+					forwardDescription.disabled = true;
+					backwardDescription.disabled = true;
+				}
+
+				let wnd = null;
+
+				// Defines the function to be executed when the
+				// OK button is pressed in the dialog
+				const okFunction = function () {
+					cell.value.forwardDescription = forwardDescription.value;
+					cell.value.backwardDescription = backwardDescription.value;
+
+					if (cell.source !== cell.target) {
+						cell.value.isa = isa.checked;
+					}
+
+					console.log(graph);
+					console.log(cell);
+
+					//Quando mexe no gráfico. Queremos que já seja visualizada as modificações depois do OK
+					//Muito difícil de achar essas incantações mágicas nesse código do mxGraph...
+					const state = graph.view.getState(cell);
+					graph.cellRenderer.redraw(state);
+
+					wnd.destroy();
+				};
+
+				// Defines the function to be executed when the
+				// Cancel button is pressed in the dialog
+				const cancelFunction = function () {
+					wnd.destroy();
+				};
+				form.addButtons(okFunction, cancelFunction);
+
+				wnd = showModalWindow('Relation properties', form.table, 320, 200);
+			}
 		}
 
-		Entity.prototype.clone = function () {
-			return mxUtils.clone(this);
-		};
+		class EntityManager {
+			constructor (objectType) {
+				this.objectType = objectType;
+			}
 
-		// Defines the table user object
-		function AbstractEntity (name) {
-			this.name = name;
-			this.objectType = ObjectType.ABSTRACT_ENTITY;
+			hasEditableProperties() {
+				return false;
+			}
+
+			createEntity(name) {
+				let entityObject = null;
+				switch (this.objectType) {
+					case ObjectType.ABSTRACT_ENTITY:
+						entityObject = new AbstractEntity(name);
+						break;
+                    case ObjectType.ENTITY:
+						entityObject = new Entity(name);
+						break;
+					default:
+						console.log(this.objectType);
+						throw "Unknown Entity Object!";
+                }
+
+                console.log(entityObject);
+				const entityCell = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), 'entity');
+				entityCell.setVertex(true);
+				//entityCell.insert(new mxCell(new Lane('Columns 123123'), new mxGeometry(0, 0, 200, 28), 'entity'));
+				//graph.addCell(new mxCell(new Lane('Constraints'), new mxGeometry(0, 0, 200, 28), 'entity'), v1);
+				//graph.addCell(new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 0, 200, 28), 'entity'), v1);
+				//
+				entityCell.insert(ColumnManager.createColumn('ID'));
+				console.log(entityCell);
+				return entityCell;
+			}
+
+			insertNewObject(graph, event, parent) {
+				console.log("insertNewObject(graph, event, parent)");
+				console.log(graph, event, parent);
+				const eventPoint = graph.getPointForEvent(event);
+				const model = graph.getModel();
+
+				let tableCount = 0;
+				const childCount = model.getChildCount(parent);
+
+				for (let i = 0; i < childCount; i++) {
+					console.log(model.getChildAt(parent, i));
+					if (model.getChildAt(parent, i).value.objectType === ObjectType.ENTITY) {
+						tableCount++;
+					}
+				}
+
+				const name = mxUtils.prompt('Enter name for new entity', 'ENTITY ' + (tableCount + 1));
+
+				if (name != null) {
+					const newEntityCell = this.createEntity(name);
+
+					newEntityCell.geometry.x = eventPoint.x;
+					newEntityCell.geometry.y = eventPoint.y;
+
+
+					console.log(newEntityCell);
+					graph.addCell(newEntityCell, parent);
+					console.log(graph);
+					console.log(parent);
+                    newEntityCell.geometry.alternateBounds = new mxRectangle(0, 0, newEntityCell.geometry.width, newEntityCell.geometry.height);
+
+                    //graph.addCell(new mxCell(new Lane('Columns'), new mxGeometry(0, 100, 200, 28), 'entityLane'), v1);
+
+                    //graph.addCell(new mxCell(new Lane('Constraints'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
+                    //graph.addCell(new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
+
+                    return newEntityCell;
+				}
+
+				return null;
+			}
 		}
 
-		AbstractEntity.prototype.clone = function () {
-			return mxUtils.clone(this);
-		};
+		class ManagerFactory {
+			static createManager(objectClass) {
+				switch (objectClass) {
+					case ObjectType.COLUMN:
+						return new ColumnManager();
+                    case ObjectType.ENTITY:
+                    case ObjectType.ABSTRACT_ENTITY:
+                    	return new EntityManager(objectClass);
+                    default:
+                    	console.log(objectClass);
+                    	throw "Unknown Class to create factory for";
+                }
+            }
+        }
 
-		function Relation (source, target) {
-			this.source = source;
-			this.target = target;
-			this.backwardDescription = '';
-			this.forwardDescription = '';
-			this.isa = false;
-			this.objectType = ObjectType.RELATION;
-		}
+		class Column {
+			constructor (name) {
+				this.name = name;
+				this.type = 'TEXT';
+				this.defaultValue = null;
+				this.notNull = false;
+			}
 
-		Relation.prototype.clone = function () {
-			const clone = new Relation(this.source, this.target);
-			clone.backwardDescription = this.backwardDescription;
-			clone.forwardDescription = this.forwardDescription;
-			clone.isa = this.isa;
-			clone.objectType = this.objectType;
+			get objectType() {
+				return ObjectType.COLUMN;
+            }
 
-			return clone;
-		};
+            clone() {
+				const clone = new Column(this.name);
+				clone.type = this.type;
+				clone.defaultValue = this.defaultValue;
+				clone.notNull = this.notNull;
 
+				return clone;
+            }
+        }
+
+        class Entity {
+			constructor (name) {
+				this.name = name;
+				this.abstract = false;
+			}
+
+			get objectType() {
+				return ObjectType.ENTITY;
+			}
+
+			clone() {
+				const clone = new Entity(name);
+				clone.abstract = this.abstract;
+
+				return clone;
+            }
+        }
+
+        class AbstractEntity extends Entity {
+			constructor (name) {
+				super(name);
+				this.abstract = true;
+			}
+        }
+
+
+        class Relation {
+			constructor (source, target) {
+				this.source = source;
+				this.target = target;
+				this.backwardDescription = '';
+				this.forwardDescription = '';
+				this.isa = false;
+			}
+
+			get objectType() {
+				return ObjectType.RELATION;
+			}
+
+			clone () {
+				const clone = new Relation(this.source, this.target);
+				clone.backwardDescription = this.backwardDescription;
+				clone.forwardDescription = this.forwardDescription;
+				clone.isa = this.isa;
+
+				return clone;
+            }
+
+        }
 
     </script>
 </head>
