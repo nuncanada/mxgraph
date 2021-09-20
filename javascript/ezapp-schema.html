@@ -742,17 +742,16 @@
 					return;
 				}
 
-				eventPoint.x -= parentState.x;
-				eventPoint.y -= parentState.y;
-
 				const columnCount = graph.model.getChildCount(targetCell);
 				const name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
 
 				if (name != null) {
 					const newColumnCell = ColumnManager.createColumn(name);
 
-					newColumnCell.geometry.x = eventPoint.x;
-					newColumnCell.geometry.y = eventPoint.y;
+					newColumnCell.geometry.x = eventPoint.x - parentState.x;
+					newColumnCell.geometry.y = eventPoint.y - parentState.y;
+
+					console.log(newColumnCell);
 
 					graph.addCell(newColumnCell, targetCell);
 				}
@@ -858,11 +857,8 @@
                 console.log(entityObject);
 				const entityCell = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), 'entity');
 				entityCell.setVertex(true);
-				//entityCell.insert(new mxCell(new Lane('Columns 123123'), new mxGeometry(0, 0, 200, 28), 'entity'));
-				//graph.addCell(new mxCell(new Lane('Constraints'), new mxGeometry(0, 0, 200, 28), 'entity'), v1);
-				//graph.addCell(new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 0, 200, 28), 'entity'), v1);
-				//
-				entityCell.insert(ColumnManager.createColumn('ID'));
+				entityCell.geometry.alternateBounds = new mxRectangle(0, 0, entityCell.geometry.width, entityCell.geometry.height);
+
 				console.log(entityCell);
 				return entityCell;
 			}
@@ -891,14 +887,36 @@
 					newEntityCell.geometry.x = eventPoint.x;
 					newEntityCell.geometry.y = eventPoint.y;
 
-
 					console.log(newEntityCell);
 					graph.addCell(newEntityCell, parent);
 					console.log(graph);
 					console.log(parent);
-                    newEntityCell.geometry.alternateBounds = new mxRectangle(0, 0, newEntityCell.geometry.width, newEntityCell.geometry.height);
 
-                    //graph.addCell(new mxCell(new Lane('Columns'), new mxGeometry(0, 100, 200, 28), 'entityLane'), v1);
+					graph.isCellSelectable = function (cell) {
+						console.log(cell);
+						if (cell.value.name === 'Columns') return false;
+						return mxGraph.prototype.isCellSelectable.apply(this, arguments); // "supercall"
+					};
+
+					const columnLane = new mxCell({name: 'Columns'}, new mxGeometry(0, 0, 200, 28), 'entity');
+					columnLane.setVertex(true);
+					columnLane.insert(ColumnManager.createColumn('ID'));
+					columnLane.setConnectable(false);
+
+					//Column ID not appearing correctly at first
+					const constraintsLane = new mxCell({name: 'Constraints'}, new mxGeometry(0, 84, 200, 28), 'entity');
+					constraintsLane.setVertex(true);
+					constraintsLane.setConnectable(false);
+
+					const virtualPropertiesLane = new mxCell({name: 'Virtual Properties'}, new mxGeometry(0, 120, 200, 28), 'entity');
+					virtualPropertiesLane.setVertex(true);
+					virtualPropertiesLane.setConnectable(false);
+
+					graph.addCell(columnLane, newEntityCell);
+					graph.addCell(constraintsLane, newEntityCell);
+					graph.addCell(virtualPropertiesLane, newEntityCell);
+
+                    console.log(graph);
 
                     //graph.addCell(new mxCell(new Lane('Constraints'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
                     //graph.addCell(new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
