@@ -5,10 +5,8 @@
   a SQL schema editor.
 
   IMPLEMENT:
-  - constraints
-  - virtual properties/columns
   - align arrows in relationship edge
-  - UUID generate IDs to track entities and relationships
+  - Create separate UUID PSEUDO Column object from Columns
   - Button apply changes
 
 -->
@@ -32,6 +30,30 @@
 
     <!-- Example code -->
     <script type="text/javascript">
+
+		function uuidv4() {
+			return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+				(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+			);
+		}
+
+		function updateVisualizationToData(graph, cell) {
+			//Quando mexe no gráfico. Queremos que já seja visualizada as modificações depois do OK
+			//Muito difícil de achar essas incantações mágicas nesse código do mxGraph...
+
+			const state = graph.view.getState(cell);
+			graph.cellRenderer.redraw(state);
+        }
+
+        //Function to be added when we have a graph and called from the Lanes to create new Objects
+        let addNewItem = null;
+
+		const CELL_STYLES = {
+			ENTITY: "entity",
+			ABSTRACT_ENTITY: "abstract_entity",
+			ENTITY_LANE: "entity_lane"
+		};
+
 		// Program starts here. Creates a sample graph in the
 		// DOM node with the specified ID. This function is invoked
 		// from the onLoad event handler of the document (see below).
@@ -100,6 +122,12 @@
 				graph.swimlaneNesting = false;
 				graph.dropEnabled = true;
 
+				addNewItem = function(mxObjectId) {
+                    const laneCell = graph.model.getCell(mxObjectId);
+                    const objectManager = LaneManager.createManagerForLaneObject(laneCell.value.name);
+                    objectManager.addNewItem(graph, laneCell);
+                };
+
 				//Didn't work?
 				//editor.dblClickAction = 'showProperties';
 
@@ -108,12 +136,16 @@
 				// Does not allow dangling edges
 				graph.setAllowDanglingEdges(false);
 
-				//Achava que ia permitir fazer um Edge de uma Entidade para si mesma mas não funcionou
+				//TODO: Review if the setAllowLoops isn't enough
 				graph.setAllowLoops(true);
 				mxGraph.prototype.allowLoops = true;
 
 				// Forces use of default edge in mxConnectionHandler
 				graph.connectionHandler.factoryMethod = null;
+
+
+
+
 
 				//Modificações Edge State
 				graph.getAllConnectionConstraints = function (terminal) {
@@ -158,14 +190,14 @@
 
 				//edgeStyle[mxConstants.STYLE_EDGE] = mxEdgeStyle.EntityRelation;
 
-				// Only tables are resizable
+				// Only entities are resizable
 				graph.isCellResizable = function (cell) {
-					return this.isSwimlane(cell);
+					return [ObjectType.ENTITY].includes(cell.value.objectType);
 				};
 
-				// Only tables are movable
+				// Only entities are movable
 				graph.isCellMovable = function (cell) {
-					return this.isSwimlane(cell);
+					return [ObjectType.ENTITY].includes(cell.value.objectType);
 				};
 
 				// Sets the graph container and configures the editor
@@ -189,6 +221,8 @@
 					return layout;
 				};
 
+				//TODO: This is tied to the double click editing. Should we give up on it?
+                //Maybe double clicking should open properties?
 				// Text label changes will go into the name field of the user object
 				graph.model.valueForCellChanged = function (cell, value) {
 					if (value.name != null) {
@@ -200,14 +234,20 @@
 					}
 				};
 
-				// Columns are dynamically created HTML labels
 				graph.isHtmlLabel = function (cell) {
-					return !this.isSwimlane(cell);
+					return [ObjectType.COLUMN, ObjectType.RELATION, ObjectType.LANE].includes(cell.value.objectType);
 				};
 
-				// Edges are not editable
 				graph.isCellEditable = function (cell) {
-					return !this.model.isEdge(cell);
+					return [ObjectType.COLUMN, ObjectType.ENTITY].includes(cell.value.objectType);
+				};
+
+				//Disable Lanes being selectable
+				graph.isCellSelectable = function (cell) {
+					if ([ObjectType.LANE, ObjectType.UUID].includes(cell.value.objectType)) {
+						return false;
+					}
+					return mxGraph.prototype.isCellSelectable.apply(this, arguments); // "supercall"
 				};
 
 				// Returns the name field of the user object for the label
@@ -230,35 +270,51 @@
 					return mxGraph.prototype.getTooltip.apply(this, arguments); // "supercall"
 				};
 
+				//REMINDER: If this does not work for LANES: mxConnectionHandler.prototype.createIcons
 				// Creates a dynamic HTML label for column fields
+                //FIXME: This should go to the RelationManager, ColumnManager, LaneManager
 				graph.getLabel = function (cell) {
 					console.log(cell);
-					if (this.isHtmlLabel(cell)) {
-						if (cell.edge) {
-							if (cell.value.isa) {
-								//FIXME: Probably it is better to change de style of the edge!
-								return '<div>IS A</div>';
-							} else {
-								//FIXME: Would look better if we align the arrows
-								return '<div><div><i class="fas fa-arrow-right"></i>&nbsp;' +
-									cell.value.forwardDescription + ' </div> ' +
-									'<br/> ' +
-									'<div><i class="fas fa-arrow-left"></i>&nbsp;' +
-									cell.value.backwardDescription +
-									'</div></div>';
-							}
-						} else {
-							var label = '';
+					if (this.isHtmlLabel(cell) && cell.value && cell.value.objectType) {
+						console.log(cell);
+						switch (cell.value.objectType) {
+							case ObjectType.RELATION:
+								if (cell.value.isa) {
+									//FIXME: Probably it is better to change de style of the edge!
+									return '<div>IS A</div>';
+								} else {
+									//FIXME: Would look better if we align the arrows
+									return '<div><div><i class="fas fa-arrow-right"></i>&nbsp;' +
+										cell.value.forwardDescription + ' </div> ' +
+										'<br/> ' +
+										'<div><i class="fas fa-arrow-left"></i>&nbsp;' +
+										cell.value.backwardDescription +
+										'</div></div>';
+								}
+								break;
+                            case ObjectType.COLUMN:
+								var label = '';
 
-							if (cell.value.primaryKey) {
-								label += '<img title="Primary Key" src="images/key.png" width="16" height="16" align="top">&nbsp;';
-							} else {
-								label += '<img src="images/spacer.gif" width="16" height="1">&nbsp;';
-							}
+								if (cell.value.primaryKey) {
+									label += '<img title="Primary Key" src="images/key.png" width="16" height="16" align="top">&nbsp;';
+								} else {
+									label += '<img src="images/spacer.gif" width="16" height="1">&nbsp;';
+								}
 
-							return label + mxUtils.htmlEntities(cell.value.name, false) + ': ' +
-								mxUtils.htmlEntities(cell.value.type, false);
-						}
+								console.log(cell.value);
+
+
+								return label + mxUtils.htmlEntities(cell.value.name, false) + ': ' +
+									mxUtils.htmlEntities(cell.value.type, false);
+								break;
+							case ObjectType.LANE:
+								//TODO: Spent a lot more time than should trying to float this image
+                                //to the right, giving up for now.
+								return cell.value.name + '<img onclick="javascript:addNewItem(' + cell.id + ')" src="images/plus.png">';
+								break;
+                            default:
+                            	throw "getLabel for HTML Labels unexpected objectType: " + cell.value.objectType;
+                        }
 					}
 
 					return mxGraph.prototype.getLabel.apply(this, arguments); // "supercall"
@@ -277,34 +333,26 @@
 				// Adds all required styles to the graph (see below)
 				configureStylesheet(graph);
 
-
-
-				// Adds primary key field into table
-				const firstColumn = ColumnManager.createColumn('ID');
-
-				//firstColumn.value.name = 'UUID';
-				firstColumn.value.type = 'UUID';
-				firstColumn.value.primaryKey = true;
-
 				addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/entity.png');
-				addSidebarIcon(graph, sidebar, ObjectType.ABSTRACT_ENTITY, 'images/icons48/abstract_entity.png');
+				addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/abstract_entity.png');
 				addSidebarIcon(graph, sidebar, ObjectType.COLUMN, 'images/icons48/column.png');
 
-				console.log(Column);
-
 				graph.addEdge = function (edge, parent, source, target, index) {
-					this.model.beginUpdate();
-					try {
-						edge.value = new Relation(source, target);
-						return mxGraph.prototype.addEdge.apply(this, arguments); // "supercall"
-					} finally {
-						this.model.endUpdate();
-					}
 
-					const manager = ManagerFactory.createManager(Relation);
-					manager.openPopupToEditProperties(graph, edge);
-
-					return null;
+					return RelationManager.openPopupToEditProperties(graph, edge, function(newRelation) {
+						graph.model.beginUpdate();
+						try {
+							edge.value = newRelation;
+							return mxGraph.prototype.addEdge.apply(graph, [edge, parent, source, target, index]); // "supercall"
+						} finally {
+							graph.model.endUpdate();
+						}
+                    },
+                        function() {
+						    //supercall not being called. Suposedly the Edge will not be created.
+						    return null;
+					    }
+                    );
 				};
 
 				// Displays useful hints in a small semi-transparent box.
@@ -344,14 +392,17 @@
 						cell = graph.getSelectionCell();
 					}
 
-					console.log(cell.value);
-					console.log(cell.value.constructor);
-					console.log(cell.value.constructor.name);
-					console.log(typeof cell.value);
-					const manager = ManagerFactory.createManager(cell.value.constructor);
+					const manager = ManagerFactory.createManager(cell.value.objectType);
 					console.log(manager);
 					if (manager.hasEditableProperties()) {
-						manager.openPopupToEditProperties(graph, cell);
+						manager.openPopupToEditProperties(graph, cell, function(newValue){
+							//Garantees the same internalUUID. Maybe we should check if new or preexisting object
+                            //TODO: And try to clone? There was some problem if the object wasn't being cloned before, but
+                            //They might not exist anymore...
+                            //newValue.internalUUID = cell.value.internalUUID;
+
+							graph.model.setValue(cell, newValue);
+                        });
                     }
 				});
 
@@ -531,6 +582,15 @@
                     return cellParent;
                 }
 
+                //Now We have Column Lanes, we want to drop columns in the Entity, so we need to check
+                //for grandparents
+                if (cellParent) {
+					const cellGrandParent = graph.getModel().getParent(cellParent);
+					if (cellGrandParent && cellGrandParent.value && cellGrandParent.value.objectType === ObjectType.ENTITY) {
+						return cellGrandParent;
+					}
+				}
+
                 return null;
 			};
 		}
@@ -568,7 +628,7 @@
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
 			entityStyle[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('entity', entityStyle);
+			graph.getStylesheet().putCellStyle(CELL_STYLES.ENTITY, entityStyle);
 
 
 			let entityLaneStyle = {};
@@ -576,8 +636,8 @@
 			entityLaneStyle[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
 			entityLaneStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_CENTER;
 			entityLaneStyle[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_TOP;
-			entityLaneStyle[mxConstants.STYLE_GRADIENTCOLOR] = '#41B9F5';
-			entityLaneStyle[mxConstants.STYLE_FILLCOLOR] = '#8CCDF5';
+			entityLaneStyle[mxConstants.STYLE_GRADIENTCOLOR] = '#2A92A1';
+			entityLaneStyle[mxConstants.STYLE_FILLCOLOR] = '#6b7388';
 			entityLaneStyle[mxConstants.STYLE_SWIMLANE_FILLCOLOR] = '#ffffff';
 			entityLaneStyle[mxConstants.STYLE_STROKECOLOR] = '#1B78C8';
 			entityLaneStyle[mxConstants.STYLE_FONTCOLOR] = '#000000';
@@ -590,7 +650,7 @@
 			// Looks better without opacity if shadow is enabled
 			entityLaneStyle[mxConstants.STYLE_OPACITY] = '80';
 			//entityLaneStyle[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('entityLane', entityLaneStyle);
+			graph.getStylesheet().putCellStyle(CELL_STYLES.ENTITY_LANE, entityLaneStyle);
 
 
 			let abstractEntityStyle = {};
@@ -612,7 +672,7 @@
 			// Looks better without opacity if shadow is enabled
 			//style[mxConstants.STYLE_OPACITY] = '80';
 			abstractEntityStyle[mxConstants.STYLE_SHADOW] = 1;
-			graph.getStylesheet().putCellStyle('abstractEntity', abstractEntityStyle);
+			graph.getStylesheet().putCellStyle(CELL_STYLES.ABSTRACT_ENTITY, abstractEntityStyle);
 
 			let defaultEdgeStyle = graph.stylesheet.getDefaultEdgeStyle();
 			defaultEdgeStyle[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
@@ -627,7 +687,7 @@
 			console.log(editor, graph, menu, cell, evt);
 
 			if (cell != null) {
-				if (ManagerFactory.createManager(cell.value).hasEditableProperties()) {
+				if (ManagerFactory.createManager(cell.value.objectType).hasEditableProperties()) {
 					menu.addItem('Properties', 'editors/images/properties.gif', function () {
 						editor.execute('properties', cell);
 					});
@@ -654,19 +714,146 @@
 		}
 
 		const ObjectType = {
-			"ENTITY": 1,
-			"COLUMN": 2,
-			"RELATION": 3,
-			"ABSTRACT_ENTITY": 4,
-            "LANE": 5
+			ENTITY: "ENTITY",
+			COLUMN: "COLUMN",
+			RELATION: "RELATION",
+            CONSTRAINT: "CONSTRAINT",
+            VIRTUAL_PROPERTY: "VIRTUAL_PROPERTY",
+            LANE: "LANE",
+            UUID: "UUID",
 		};
+
+
+        const ColumnTypes = {
+			UUID: 'UUID',
+            TEXT: 'TEXT',  // Optimization if just small strings or text or whatever on the platform
+			REGEX: 'REGEX', // Maybe TEXT sub-type? Or unique? Which would be more user-friendly?
+			INTEGER: 'INTEGER',  //FIXME in the future: Platform should handle integer overflow nicely
+			BOOLEAN: 'BOOLEAN',
+			DECIMAL: 'DECIMAL', // (max_digits, max_decimals)
+			FLOAT_32: 'FLOAT_32',
+			DATE_TIME: 'DATE_TIME', //Many many possibilities HISTORIC, IMPRECISE, AROUND, ERROR BAR, JUST DATE, JUST TIME, PERIODIC DAY, WEEKLY etc MILLISECONDS, MICROSECONDS, PICOSECONDS -- Platform should store only timestamps in UTC plus extra data if necessary (error bars etc) and deal with everything needed on the frontend
+			SEQUENCIAL: 'SEQUENCIAL', // Allow WHERE like condition for slicing the sequence groups (given year like: invoice.fiscal_year.year)
+        };
+
+        const LaneTypes = {
+        	COLUMNS: 'Columns',
+            CONSTRAINTS: 'Constraints',
+            VIRTUAL_PROPERTIES: 'Virtual Properties',
+        };
+
+		class Column {
+			constructor (name, type, notNull, defaultValue) {
+				this.internalUUID = uuidv4();
+				this.update(name, type, notNull, defaultValue)
+			}
+
+			update (name, type, notNull, defaultValue) {
+				this.name = name;
+				this.type = type;
+				this.defaultValue = defaultValue;
+				this.notNull = notNull;
+			}
+
+			get objectType() {
+				return ObjectType.COLUMN;
+            }
+        }
+
+        class Entity {
+			constructor (name, abstract) {
+				this.internalUUID = uuidv4();
+				this.update(name, abstract);
+			}
+
+			update (name, abstract) {
+				this.name = name;
+				this.abstract = abstract;
+			}
+
+			get objectType() {
+				return ObjectType.ENTITY;
+			}
+        }
+
+        class Relation {
+			constructor (forwardDescription, backwardDescription, isa) {
+				this.internalUUID = uuidv4();
+				this.update(forwardDescription, backwardDescription, isa);
+			}
+
+			update (forwardDescription, backwardDescription, isa) {
+				this.forwardDescription = forwardDescription;
+				this.backwardDescription = backwardDescription;
+				this.isa = isa;
+			}
+
+			get objectType() {
+				return ObjectType.RELATION;
+			}
+        }
+
+		class Constraint {
+			constructor (name, constraint) {
+				this.internalUUID = uuidv4();
+				this.update(name, constraint);
+			}
+
+			update (name, constraint) {
+				this.name = name;
+				this.constraint = constraint;
+			}
+
+			get objectType() {
+				return ObjectType.CONSTRAINT;
+			}
+		}
+
+		class VirtualProperty {
+			constructor (name, expression) {
+				this.internalUUID = uuidv4();
+				this.update(name, expression);
+			}
+
+			update (name, expression) {
+				this.name = name;
+				this.expression = expression;
+			}
+
+			get objectType() {
+				return ObjectType.VIRTUAL_PROPERTY;
+			}
+		}
+
+		//No constructor nor internalUUID, just a placeholder
+		class ObjectUUID {
+			get objectType() {
+				return ObjectType.UUID;
+			}
+		}
+
+		class Lane {
+			constructor (name) {
+				this.name = name;
+			}
+
+			get objectType() {
+				return ObjectType.LANE;
+			}
+		}
+
+        // All managers should have the interface:
+		// static hasEditableProperties() : boolean
+        // If it has Editable Properties:
+        // static openPopupToEditProperties(graph, cell, resolve, reject)
 
 		class ColumnManager {
 
-			static createColumn(name) {
+			static createColumnCell(column) {
 				// Adds sidebar icon for the column object
-				const columnObject = new Column(name);
-				const columnCell = new mxCell(columnObject, new mxGeometry(0, 0, 0, 26));
+				const columnCell = new mxCell(column, new mxGeometry(0, 28, 100, 26));
+				//For some reason, alternateBounds has a really big width by default?
+				columnCell.geometry.alternateBounds = new mxRectangle(0, 0, columnCell.geometry.width, columnCell.geometry.height);
 
 				columnCell.setVertex(true);
 				columnCell.setConnectable(false);
@@ -674,67 +861,40 @@
 				return columnCell;
 			}
 
-			hasEditableProperties() {
+			static hasEditableProperties() {
 				return true;
 			}
 
-			openPopupToEditProperties(graph, cell) {
+			static openPopupToEditProperties(graph, cell, resolve, reject) {
+				return ColumnManager.openPopupToEditColumnProperties(graph, cell.value, resolve, reject);
+			}
+
+			static openPopupToEditColumnProperties(graph, columnObject, resolve, reject) {
 				const form = new mxForm('properties');
 
-				// Adds a field for the columnname
-				const nameField = form.addText('Name', cell.value.name);
-				const typeField = form.addText('Type', cell.value.type);
+				const nameField = form.addText('Name', columnObject.name);
+				const typeField = form.addText('Type', columnObject.type);
 
-				const notNullField = form.addCheckbox('Not Null', cell.value.notNull);
+				const notNullField = form.addCheckbox('Not Null', columnObject.notNull);
+				const defaultField = form.addText('Default', columnObject.defaultValue);
 
-				const useDefaultField = form.addCheckbox('Use Default', (cell.value.defaultValue != null));
-				const defaultField = form.addText('Default', cell.value.defaultValue || '');
+				let wnd = showModalWindow('Column Properties', form.table, 240, 240);
 
-				let wnd = null;
-
-				// Defines the function to be executed when the
-				// OK button is pressed in the dialog
 				const okFunction = function () {
-					const clone = cell.value.clone();
-
-					clone.name = nameField.value;
-					clone.type = typeField.value;
-
-					if (useDefaultField.checked) {
-						clone.defaultValue = defaultField.value;
-					} else {
-						clone.defaultValue = null;
-					}
-
-					clone.primaryKey = primaryKeyField.checked;
-					clone.notNull = notNullField.checked;
-
-					graph.model.setValue(cell, clone);
-
+                    columnObject.update(nameField.value, typeField.value, notNullField.checked, defaultField.value);
+					resolve(columnObject);
 					wnd.destroy();
 				};
 
-				// Defines the function to be executed when the
-				// Cancel button is pressed in the dialog
 				const cancelFunction = function () {
+					reject();
 					wnd.destroy();
 				};
 				form.addButtons(okFunction, cancelFunction);
-
-				const parent = graph.model.getParent(cell);
-				console.log(cell);
-				if (cell.edge) {
-					let name = cell.value.source.name + '<->' + cell.value.target.name;
-				} else {
-					let name = parent.value.name + '.' + cell.value.name;
-				}
-				wnd = showModalWindow(name, form.table, 240, 240);
 			}
 
-		    insertNewObject(graph, event, targetCell) {
+			static columnObjectCreatedNowInsertNewCellIntoGraph(graph, event, targetCell, columnObject) {
 				const eventPoint = graph.getPointForEvent(event);
-				const model = graph.getModel();
-
 				const parentState = graph.getView().getState(targetCell);
 				console.log(targetCell, parentState);
 				if (targetCell == null || parentState == null) {
@@ -742,278 +902,382 @@
 					return;
 				}
 
-				const columnCount = graph.model.getChildCount(targetCell);
-				const name = mxUtils.prompt('Enter name for new column', 'COLUMN ' + columnCount);
+                const newColumnCell = ColumnManager.createColumnCell(columnObject);
 
-				if (name != null) {
-					const newColumnCell = ColumnManager.createColumn(name);
+                newColumnCell.geometry.x = eventPoint.x - parentState.x;
+                newColumnCell.geometry.y = eventPoint.y - parentState.y;
 
-					newColumnCell.geometry.x = eventPoint.x - parentState.x;
-					newColumnCell.geometry.y = eventPoint.y - parentState.y;
+                console.log(newColumnCell);
 
-					console.log(newColumnCell);
-
-					graph.addCell(newColumnCell, targetCell);
-				}
-
+                graph.addCell(newColumnCell, targetCell.columnsLane);
             }
+
+			static insertNewObject(graph, event, targetCell) {
+				console.log("insertNewObject(graph, event)");
+				console.log(graph, event);
+
+				//const columnCount = graph.model.getChildCount(targetCell.columnsLane);
+				//TODO: Parametrize default values
+				const newColumn = ColumnManager.getDefaultColumn();
+
+				ColumnManager.openPopupToEditColumnProperties(graph, newColumn, function(newColumn) {
+					ColumnManager.columnObjectCreatedNowInsertNewCellIntoGraph(graph, event, targetCell, newColumn)
+				}, function(){});
+			}
+
+
+			static addNewItem(graph, laneCell) {
+				console.log("addNewItem(graph, laneCell)");
+				console.log(graph, laneCell);
+
+				const newColumn = ColumnManager.getDefaultColumn();
+
+				ColumnManager.openPopupToEditColumnProperties(graph, newColumn, function(newColumn) {
+					const newColumnCell = ColumnManager.createColumnCell(newColumn);
+					graph.addCell(newColumnCell, laneCell);
+				}, function(){});
+            }
+
+            static getDefaultColumn() {
+				//const columnCount = graph.model.getChildCount(targetCell.columnsLane);
+				//TODO: Parametrize default values
+				return new Column('NEW COLUMN', ColumnTypes.TEXT, true, '');
+            }
+
 		}
 
 		class RelationManager {
-			hasEditableProperties() {
+			static hasEditableProperties() {
 				return true;
 			}
 
-			openPopupToEditProperties(graph, cell) {
-				// Creates a form for the user object inside
-				// the cell
+			static openPopupToEditProperties(graph, edge, resolve, reject) {
+				const sourceEqualsTarget = edge.source === edge.target;
+
+				if (!edge.value) {
+					//TODO: parametrize default values
+					edge.value = new Relation("Forward's Relation", "Backward's Relation", false);
+                }
+
+				const currentRelation = edge.value;
+
 				//mxEditor.prototype.propertiesWidth = 240;
 				const form = new mxForm('properties');
-				let isa = null;
 
-				if (cell.source !== cell.target) {
-					isa = form.addCheckbox('IS A', cell.value.isa);
+				let isa = form.addCheckbox('IS A', currentRelation.isa);
+				//FIXME: Create a constant's file for the defaults here
+				const forwardDescription = form.addText('Forward relation description', currentRelation.forwardDescription);
+				const backwardDescription = form.addText('Backward relation description', currentRelation.backwardDescription);
 
-					isa.onchange = function () {
-						if (isa.checked) {
-							forwardDescription.disabled = true;
-							backwardDescription.disabled = true;
-							forwardDescription.value = 'IS A';
-							backwardDescription.value = '';
-						} else {
-							forwardDescription.disabled = false;
-							backwardDescription.disabled = false;
-							forwardDescription.value = '';
-							backwardDescription.value = '';
-						}
-					};
-				}
-
-				const forwardDescription = form.addText('Forward relation description', cell.value.forwardDescription);
-				const backwardDescription = form.addText('Backward relation description', cell.value.backwardDescription);
-
-				if (cell.value.isa) {
-					forwardDescription.disabled = true;
-					backwardDescription.disabled = true;
-				}
-
-				let wnd = null;
-
-				// Defines the function to be executed when the
-				// OK button is pressed in the dialog
-				const okFunction = function () {
-					cell.value.forwardDescription = forwardDescription.value;
-					cell.value.backwardDescription = backwardDescription.value;
-
-					if (cell.source !== cell.target) {
-						cell.value.isa = isa.checked;
+				function disableDescriptionsIfISA() {
+					if (isa.checked) {
+						forwardDescription.disabled = true;
+						backwardDescription.disabled = true;
+					} else {
+						forwardDescription.disabled = false;
+						backwardDescription.disabled = false;
 					}
+                }
 
-					console.log(graph);
-					console.log(cell);
+				disableDescriptionsIfISA();
+                isa.onchange = function () {
+					disableDescriptionsIfISA();
+                };
 
-					//Quando mexe no gráfico. Queremos que já seja visualizada as modificações depois do OK
-					//Muito difícil de achar essas incantações mágicas nesse código do mxGraph...
-					const state = graph.view.getState(cell);
-					graph.cellRenderer.redraw(state);
+				if (sourceEqualsTarget) {
+					isa.disabled = true;
+				}
 
-					wnd.destroy();
+				let relationPropertiesWindow = null;
+				const okFunction = function () {
+					currentRelation.update(forwardDescription.value, backwardDescription.value , isa.checked);
+					relationPropertiesWindow.destroy();
+					resolve(currentRelation);
 				};
-
-				// Defines the function to be executed when the
-				// Cancel button is pressed in the dialog
 				const cancelFunction = function () {
-					wnd.destroy();
+					relationPropertiesWindow.destroy();
+					reject();
 				};
 				form.addButtons(okFunction, cancelFunction);
 
-				wnd = showModalWindow('Relation properties', form.table, 320, 200);
+				relationPropertiesWindow = showModalWindow('Relation properties', form.table, 320, 200);
 			}
 		}
 
 		class EntityManager {
-			constructor (objectType) {
-				this.objectType = objectType;
+			static hasEditableProperties() {
+				return true;
 			}
 
-			hasEditableProperties() {
-				return false;
-			}
+			static entityObjectCreatedNowInsertNewCellIntoGraph(graph, event, entityObject) {
+				const defaultParent = graph.getDefaultParent();
 
-			createEntity(name) {
-				let entityObject = null;
-				switch (this.objectType) {
-					case ObjectType.ABSTRACT_ENTITY:
-						entityObject = new AbstractEntity(name);
-						break;
-                    case ObjectType.ENTITY:
-						entityObject = new Entity(name);
-						break;
-					default:
-						console.log(this.objectType);
-						throw "Unknown Entity Object!";
-                }
-
-                console.log(entityObject);
-				const entityCell = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), 'entity');
-				entityCell.setVertex(true);
-				entityCell.geometry.alternateBounds = new mxRectangle(0, 0, entityCell.geometry.width, entityCell.geometry.height);
-
-				console.log(entityCell);
-				return entityCell;
-			}
-
-			insertNewObject(graph, event, parent) {
-				console.log("insertNewObject(graph, event, parent)");
-				console.log(graph, event, parent);
 				const eventPoint = graph.getPointForEvent(event);
-				const model = graph.getModel();
 
-				let tableCount = 0;
-				const childCount = model.getChildCount(parent);
+				const newEntityCell = new mxCell(entityObject, new mxGeometry(0, 0, 200, 28), entityObject.abstract?CELL_STYLES.ABSTRACT_ENTITY:CELL_STYLES.ENTITY);
+				newEntityCell.setVertex(true);
+				//For some reason, alternateBounds has a really big width by default?
+				newEntityCell.geometry.alternateBounds = new mxRectangle(0, 0, newEntityCell.geometry.width, newEntityCell.geometry.height);
 
-				for (let i = 0; i < childCount; i++) {
-					console.log(model.getChildAt(parent, i));
-					if (model.getChildAt(parent, i).value.objectType === ObjectType.ENTITY) {
-						tableCount++;
-					}
-				}
+				newEntityCell.geometry.x = eventPoint.x;
+				newEntityCell.geometry.y = eventPoint.y;
 
-				const name = mxUtils.prompt('Enter name for new entity', 'ENTITY ' + (tableCount + 1));
+				console.log(newEntityCell, defaultParent);
+				graph.addCell(newEntityCell, defaultParent);
+				//PSEUDO-COLUMN: Is this the best way to do it? Maybe create a real Column Object?
+                //Maybe create a new type and add it to isHtmlLabel?
+				const uuidColumn = new Column('ID', ColumnTypes.UUID, true, '');
+                uuidColumn.primaryKey=  true;
+				const idColumn = ColumnManager.createColumnCell(uuidColumn);
 
-				if (name != null) {
-					const newEntityCell = this.createEntity(name);
+				graph.addCell(idColumn, newEntityCell);
+				console.log(graph);
 
-					newEntityCell.geometry.x = eventPoint.x;
-					newEntityCell.geometry.y = eventPoint.y;
+				//FIXME: Lanes creation code should be moved to the LaneManager
+				const columnsLane = new mxCell(new Lane('Columns'), new mxGeometry(0, 56, 200, 28), CELL_STYLES.ENTITY_LANE);
+				columnsLane.setVertex(true);
+				columnsLane.setConnectable(false);
+				//This was in the original code what is its purpose?
+				columnsLane.geometry.alternateBounds = new mxRectangle(0, 0, columnsLane.geometry.width, columnsLane.geometry.height);
 
-					console.log(newEntityCell);
-					graph.addCell(newEntityCell, parent);
-					console.log(graph);
-					console.log(parent);
+				//Column ID not appearing correctly at first
+				const constraintsLane = new mxCell(new Lane('Constraints'), new mxGeometry(0, 112, 200, 28), CELL_STYLES.ENTITY_LANE);
+				constraintsLane.setVertex(true);
+				constraintsLane.setConnectable(false);
+				constraintsLane.geometry.alternateBounds = new mxRectangle(0, 0, constraintsLane.geometry.width, constraintsLane.geometry.height);
 
-					graph.isCellSelectable = function (cell) {
-						console.log(cell);
-						if (cell.value.name === 'Columns') return false;
-						return mxGraph.prototype.isCellSelectable.apply(this, arguments); // "supercall"
-					};
 
-					const columnLane = new mxCell({name: 'Columns'}, new mxGeometry(0, 0, 200, 28), 'entity');
-					columnLane.setVertex(true);
-					columnLane.insert(ColumnManager.createColumn('ID'));
-					columnLane.setConnectable(false);
+				const virtualPropertiesLane = new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 140, 200, 28), CELL_STYLES.ENTITY_LANE);
+				virtualPropertiesLane.setVertex(true);
+				virtualPropertiesLane.setConnectable(false);
+				virtualPropertiesLane.geometry.alternateBounds = new mxRectangle(0, 0, virtualPropertiesLane.geometry.width, virtualPropertiesLane.geometry.height);
 
-					//Column ID not appearing correctly at first
-					const constraintsLane = new mxCell({name: 'Constraints'}, new mxGeometry(0, 84, 200, 28), 'entity');
-					constraintsLane.setVertex(true);
-					constraintsLane.setConnectable(false);
+				newEntityCell.columnsLane = columnsLane;
+				newEntityCell.constraintsLane = constraintsLane;
+				newEntityCell.virtualPropertiesLane = virtualPropertiesLane;
 
-					const virtualPropertiesLane = new mxCell({name: 'Virtual Properties'}, new mxGeometry(0, 120, 200, 28), 'entity');
-					virtualPropertiesLane.setVertex(true);
-					virtualPropertiesLane.setConnectable(false);
+				graph.addCell(columnsLane, newEntityCell);
+				graph.addCell(constraintsLane, newEntityCell);
+				graph.addCell(virtualPropertiesLane, newEntityCell);
 
-					graph.addCell(columnLane, newEntityCell);
-					graph.addCell(constraintsLane, newEntityCell);
-					graph.addCell(virtualPropertiesLane, newEntityCell);
+				console.log(graph);
 
-                    console.log(graph);
+				return newEntityCell;
+            }
 
-                    //graph.addCell(new mxCell(new Lane('Constraints'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
-                    //graph.addCell(new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 0, 200, 28), 'entityLane'), v1);
+			static insertNewObject(graph, event, targetCell) {
+				console.log("insertNewObject(graph, event)");
+				console.log(graph, event);
 
-                    return newEntityCell;
-				}
+				//TODO: Default values for new Entity, parametrize
+				const newEntityObject = new Entity('New Entity', false);
+				EntityManager.openPopupToEditPropertiesEntityObject(graph, newEntityObject,
+                    function(entityObject){
+					    EntityManager.entityObjectCreatedNowInsertNewCellIntoGraph(graph, event, entityObject)
+				    },
+                    function(){}
+                );
+			}
 
-				return null;
+			static openPopupToEditProperties(graph, cell, resolve, reject) {
+				EntityManager.openPopupToEditPropertiesEntityObject(graph, cell.value, resolve, reject);
+			}
+
+			static openPopupToEditPropertiesEntityObject(graph, entityObject, resolve, reject) {
+				//mxEditor.prototype.propertiesWidth = 240;
+				const form = new mxForm('properties');
+
+				const nameTextbox = form.addText('Name', entityObject.name);
+				let isAbstractCheckbox = form.addCheckbox('Abstract Entity?', entityObject.isAbstract);
+
+				let entityPropertiesWindow = showModalWindow('Entity Properties', form.table, 320, 200);
+
+				const okFunction = function () {
+					entityObject.update(nameTextbox.value, isAbstractCheckbox.checked);
+					resolve(entityObject);
+					entityPropertiesWindow.destroy();
+				};
+
+				const cancelFunction = function () {
+					reject();
+					entityPropertiesWindow.destroy();
+				};
+
+				form.addButtons(okFunction, cancelFunction);
+			}
+
+		}
+
+
+		class ConstraintManager {
+
+			static createConstraintCell(constraint) {
+				// Adds sidebar icon for the column object
+				const constraintCell = new mxCell(constraint, new mxGeometry(0, 28, 100, 26));
+				//For some reason, alternateBounds has a really big width by default?
+				constraintCell.geometry.alternateBounds = new mxRectangle(0, 0, constraintCell.geometry.width, constraintCell.geometry.height);
+
+				constraintCell.setVertex(true);
+				constraintCell.setConnectable(false);
+
+				return constraintCell;
+			}
+
+			static hasEditableProperties() {
+				return true;
+			}
+
+			static openPopupToEditProperties(graph, cell, resolve, reject) {
+				return ConstraintManager.openPopupToEditConstraintProperties(graph, cell.value, resolve, reject);
+			}
+
+			static openPopupToEditConstraintProperties(graph, constraintObject, resolve, reject) {
+				const form = new mxForm('properties');
+
+				const nameField = form.addText('Name', constraintObject.name);
+				const constraintField = form.addText('Constraint', constraintObject.constraint);
+
+				let wnd = showModalWindow('Constraint Properties', form.table, 240, 240);
+
+				const okFunction = function () {
+					constraintObject.update(nameField.value, constraintField.value);
+					resolve(constraintObject);
+					wnd.destroy();
+				};
+
+				const cancelFunction = function () {
+					reject();
+					wnd.destroy();
+				};
+				form.addButtons(okFunction, cancelFunction);
+			}
+
+			static addNewItem(graph, laneCell) {
+				console.log("addNewItem(graph, laneCell)");
+				console.log(graph, laneCell);
+
+				const newConstraint = ConstraintManager.getDefaultConstraint();
+
+				ConstraintManager.openPopupToEditConstraintProperties(graph, newConstraint, function(newConstraint) {
+					const constraintCell = ConstraintManager.createConstraintCell(newConstraint);
+					graph.addCell(constraintCell, laneCell);
+				}, function(){});
+			}
+
+			static getDefaultConstraint() {
+				//const constraintCount = graph.model.getChildCount(targetCell.constraintsLane);
+				//TODO: Parametrize default values
+				return new Constraint('NEW CONSTRAINT', 'true');
+			}
+
+		}
+
+
+
+		class VirtualPropertyManager {
+
+			static createVirtualPropertyCell(virtualProperty) {
+				// Adds sidebar icon for the column object
+				const virtualPropertyCell = new mxCell(virtualProperty, new mxGeometry(0, 28, 100, 26));
+				//For some reason, alternateBounds has a really big width by default?
+				virtualPropertyCell.geometry.alternateBounds = new mxRectangle(0, 0, virtualPropertyCell.geometry.width, virtualPropertyCell.geometry.height);
+
+				virtualPropertyCell.setVertex(true);
+				virtualPropertyCell.setConnectable(false);
+
+				return virtualPropertyCell;
+			}
+
+			static hasEditableProperties() {
+				return true;
+			}
+
+			static openPopupToEditProperties(graph, cell, resolve, reject) {
+				return VirtualPropertyManager.openPopupToEditVirtualPropertyProperties(graph, cell.value, resolve, reject);
+			}
+
+			static openPopupToEditVirtualPropertyProperties(graph, virtualPropertyObject, resolve, reject) {
+				const form = new mxForm('properties');
+
+				const nameField = form.addText('Name', virtualPropertyObject.name);
+				const expressionField = form.addText('VirtualProperty', virtualPropertyObject.expression);
+
+				let wnd = showModalWindow('VirtualProperty Properties', form.table, 240, 240);
+
+				const okFunction = function () {
+					virtualPropertyObject.update(nameField.value, expressionField.value);
+					resolve(virtualPropertyObject);
+					wnd.destroy();
+				};
+
+				const cancelFunction = function () {
+					reject();
+					wnd.destroy();
+				};
+				form.addButtons(okFunction, cancelFunction);
+			}
+
+			static addNewItem(graph, laneCell) {
+				console.log("addNewItem(graph, laneCell)");
+				console.log(graph, laneCell);
+
+				const newVirtualProperty = VirtualPropertyManager.getDefaultVirtualProperty();
+
+				VirtualPropertyManager.openPopupToEditVirtualPropertyProperties(graph, newVirtualProperty, function(newVirtualProperty) {
+					const virtualPropertyCell = VirtualPropertyManager.createVirtualPropertyCell(newVirtualProperty);
+					graph.addCell(virtualPropertyCell, laneCell);
+				}, function(){});
+			}
+
+			static getDefaultVirtualProperty() {
+				//const virtualPropertyCount = graph.model.getChildCount(targetCell.virtualPropertysLane);
+				//TODO: Parametrize default values
+				return new VirtualProperty('IS TURTLE', 'name like "%Turtle%"');
+			}
+
+		}
+
+
+
+		class LaneManager {
+			static createManagerForLaneObject (laneName) {
+				switch (laneName) {
+					case LaneTypes.COLUMNS:
+						return ColumnManager;
+					case LaneTypes.CONSTRAINTS:
+						return ConstraintManager;
+					case LaneTypes.VIRTUAL_PROPERTIES:
+						return VirtualPropertyManager;
+                    default:
+                    	throw "Unknown Lane Type: " + laneName;
+                }
+            }
+
+			static hasEditableProperties() {
+				return false;
 			}
 		}
 
 		class ManagerFactory {
-			static createManager(objectClass) {
-				switch (objectClass) {
+			static createManager(objectType) {
+				switch (objectType) {
 					case ObjectType.COLUMN:
-						return new ColumnManager();
-                    case ObjectType.ENTITY:
-                    case ObjectType.ABSTRACT_ENTITY:
-                    	return new EntityManager(objectClass);
+						return ColumnManager;
+					case ObjectType.ENTITY:
+						return EntityManager;
+					case ObjectType.RELATION:
+						return RelationManager;
+					case ObjectType.CONSTRAINT:
+						return ConstraintManager;
+					case ObjectType.VIRTUAL_PROPERTY:
+						return VirtualPropertyManager;
                     default:
-                    	console.log(objectClass);
-                    	throw "Unknown Class to create factory for";
-                }
-            }
-        }
-
-		class Column {
-			constructor (name) {
-				this.name = name;
-				this.type = 'TEXT';
-				this.defaultValue = null;
-				this.notNull = false;
+						console.log(objectType);
+						throw "Unknown Class to create factory for";
+				}
 			}
+		}
 
-			get objectType() {
-				return ObjectType.COLUMN;
-            }
-
-            clone() {
-				const clone = new Column(this.name);
-				clone.type = this.type;
-				clone.defaultValue = this.defaultValue;
-				clone.notNull = this.notNull;
-
-				return clone;
-            }
-        }
-
-        class Entity {
-			constructor (name) {
-				this.name = name;
-				this.abstract = false;
-			}
-
-			get objectType() {
-				return ObjectType.ENTITY;
-			}
-
-			clone() {
-				const clone = new Entity(name);
-				clone.abstract = this.abstract;
-
-				return clone;
-            }
-        }
-
-        class AbstractEntity extends Entity {
-			constructor (name) {
-				super(name);
-				this.abstract = true;
-			}
-        }
-
-
-        class Relation {
-			constructor (source, target) {
-				this.source = source;
-				this.target = target;
-				this.backwardDescription = '';
-				this.forwardDescription = '';
-				this.isa = false;
-			}
-
-			get objectType() {
-				return ObjectType.RELATION;
-			}
-
-			clone () {
-				const clone = new Relation(this.source, this.target);
-				clone.backwardDescription = this.backwardDescription;
-				clone.forwardDescription = this.forwardDescription;
-				clone.isa = this.isa;
-
-				return clone;
-            }
-
-        }
 
     </script>
 </head>
