@@ -5,9 +5,30 @@
   a SQL schema editor.
 
   IMPLEMENT:
+
+  - Ditch current properties editing for the usual RAD properties column on the right
+  - Fix abstract entities to appear different - already existing style abstractEntity
+  - Stop Relationships from stacking/hiding one another
+  - Improve the algorithm to display self-relationships
+  - Relationships can also have properties/columns
   - align arrows in relationship edge
   - Create separate UUID PSEUDO Column object from Columns
   - Button apply changes
+  - PHP (Javascript????) Parser for the generated XML
+  - CREATE/ALTER tables in PostgreSQL
+  - How to create transactional indexes for computed values?
+  - Both backend and frontend caching in synchronicity
+  - Frontend templates parsing for columns/computedValues
+  - Template editor with formula builder
+  - State Handling -- There should be interaction between different editors (State Modeler and Schema Editor)
+  - Authorization handler
+  - Javascript code for autocompleting columns/relationships/computedValues
+  - Constraints formula builder
+  - ComputedValues formula builder
+  - webpack bundling
+  - Properly separate code here in different files/modules
+  - Import tool for data from existing databases
+    - Keep synchronizing to an existing database with an overlay (?Is this worth the huge complexity?)
 
 -->
 <html>
@@ -334,8 +355,8 @@
 				configureStylesheet(graph);
 
 				addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/entity.png');
-				addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/abstract_entity.png');
-				addSidebarIcon(graph, sidebar, ObjectType.COLUMN, 'images/icons48/column.png');
+				//addSidebarIcon(graph, sidebar, ObjectType.ENTITY, 'images/icons48/abstract_entity.png');
+				//addSidebarIcon(graph, sidebar, ObjectType.COLUMN, 'images/icons48/column.png');
 
 				graph.addEdge = function (edge, parent, source, target, index) {
 
@@ -718,7 +739,7 @@
 			COLUMN: "COLUMN",
 			RELATION: "RELATION",
             CONSTRAINT: "CONSTRAINT",
-            VIRTUAL_PROPERTY: "VIRTUAL_PROPERTY",
+            COMPUTED_VALUES: "COMPUTED_VALUES",
             LANE: "LANE",
             UUID: "UUID",
 		};
@@ -739,7 +760,7 @@
         const LaneTypes = {
         	COLUMNS: 'Columns',
             CONSTRAINTS: 'Constraints',
-            VIRTUAL_PROPERTIES: 'Virtual Properties',
+            COMPUTED_VALUES: 'Computed Values',
         };
 
 		class Column {
@@ -809,7 +830,7 @@
 			}
 		}
 
-		class VirtualProperty {
+		class ComputedValue {
 			constructor (name, expression) {
 				this.internalUUID = uuidv4();
 				this.update(name, expression);
@@ -821,7 +842,7 @@
 			}
 
 			get objectType() {
-				return ObjectType.VIRTUAL_PROPERTY;
+				return ObjectType.COMPUTED_VALUES;
 			}
 		}
 
@@ -1047,18 +1068,18 @@
 				constraintsLane.geometry.alternateBounds = new mxRectangle(0, 0, constraintsLane.geometry.width, constraintsLane.geometry.height);
 
 
-				const virtualPropertiesLane = new mxCell(new Lane('Virtual Properties'), new mxGeometry(0, 140, 200, 28), CELL_STYLES.ENTITY_LANE);
-				virtualPropertiesLane.setVertex(true);
-				virtualPropertiesLane.setConnectable(false);
-				virtualPropertiesLane.geometry.alternateBounds = new mxRectangle(0, 0, virtualPropertiesLane.geometry.width, virtualPropertiesLane.geometry.height);
+				const computedValuesLane = new mxCell(new Lane('Computed Values'), new mxGeometry(0, 140, 200, 28), CELL_STYLES.ENTITY_LANE);
+				computedValuesLane.setVertex(true);
+				computedValuesLane.setConnectable(false);
+				computedValuesLane.geometry.alternateBounds = new mxRectangle(0, 0, computedValuesLane.geometry.width, computedValuesLane.geometry.height);
 
 				newEntityCell.columnsLane = columnsLane;
 				newEntityCell.constraintsLane = constraintsLane;
-				newEntityCell.virtualPropertiesLane = virtualPropertiesLane;
+				newEntityCell.computedValuesLane = computedValuesLane;
 
 				graph.addCell(columnsLane, newEntityCell);
 				graph.addCell(constraintsLane, newEntityCell);
-				graph.addCell(virtualPropertiesLane, newEntityCell);
+				graph.addCell(computedValuesLane, newEntityCell);
 
 				console.log(graph);
 
@@ -1174,18 +1195,18 @@
 
 
 
-		class VirtualPropertyManager {
+		class ComputedValueManager {
 
-			static createVirtualPropertyCell(virtualProperty) {
+			static createComputedValueCell(computedValue) {
 				// Adds sidebar icon for the column object
-				const virtualPropertyCell = new mxCell(virtualProperty, new mxGeometry(0, 28, 100, 26));
+				const computedValueCell = new mxCell(computedValue, new mxGeometry(0, 28, 100, 26));
 				//For some reason, alternateBounds has a really big width by default?
-				virtualPropertyCell.geometry.alternateBounds = new mxRectangle(0, 0, virtualPropertyCell.geometry.width, virtualPropertyCell.geometry.height);
+				computedValueCell.geometry.alternateBounds = new mxRectangle(0, 0, computedValueCell.geometry.width, computedValueCell.geometry.height);
 
-				virtualPropertyCell.setVertex(true);
-				virtualPropertyCell.setConnectable(false);
+				computedValueCell.setVertex(true);
+				computedValueCell.setConnectable(false);
 
-				return virtualPropertyCell;
+				return computedValueCell;
 			}
 
 			static hasEditableProperties() {
@@ -1193,20 +1214,20 @@
 			}
 
 			static openPopupToEditProperties(graph, cell, resolve, reject) {
-				return VirtualPropertyManager.openPopupToEditVirtualPropertyProperties(graph, cell.value, resolve, reject);
+				return ComputedValueManager.openPopupToEditComputedValueProperties(graph, cell.value, resolve, reject);
 			}
 
-			static openPopupToEditVirtualPropertyProperties(graph, virtualPropertyObject, resolve, reject) {
+			static openPopupToEditComputedValueProperties(graph, computedValueObject, resolve, reject) {
 				const form = new mxForm('properties');
 
-				const nameField = form.addText('Name', virtualPropertyObject.name);
-				const expressionField = form.addText('VirtualProperty', virtualPropertyObject.expression);
+				const nameField = form.addText('Name', computedValueObject.name);
+				const expressionField = form.addText('ComputedValue', computedValueObject.expression);
 
-				let wnd = showModalWindow('VirtualProperty Properties', form.table, 240, 240);
+				let wnd = showModalWindow('ComputedValue Properties', form.table, 240, 240);
 
 				const okFunction = function () {
-					virtualPropertyObject.update(nameField.value, expressionField.value);
-					resolve(virtualPropertyObject);
+					computedValueObject.update(nameField.value, expressionField.value);
+					resolve(computedValueObject);
 					wnd.destroy();
 				};
 
@@ -1221,18 +1242,18 @@
 				console.log("addNewItem(graph, laneCell)");
 				console.log(graph, laneCell);
 
-				const newVirtualProperty = VirtualPropertyManager.getDefaultVirtualProperty();
+				const newComputedValue = ComputedValueManager.getDefaultComputedValue();
 
-				VirtualPropertyManager.openPopupToEditVirtualPropertyProperties(graph, newVirtualProperty, function(newVirtualProperty) {
-					const virtualPropertyCell = VirtualPropertyManager.createVirtualPropertyCell(newVirtualProperty);
-					graph.addCell(virtualPropertyCell, laneCell);
+				ComputedValueManager.openPopupToEditComputedValueProperties(graph, newComputedValue, function(newComputedValue) {
+					const computedValueCell = ComputedValueManager.createComputedValueCell(newComputedValue);
+					graph.addCell(computedValueCell, laneCell);
 				}, function(){});
 			}
 
-			static getDefaultVirtualProperty() {
-				//const virtualPropertyCount = graph.model.getChildCount(targetCell.virtualPropertysLane);
+			static getDefaultComputedValue() {
+				//const computedValueCount = graph.model.getChildCount(targetCell.computedValuesLane);
 				//TODO: Parametrize default values
-				return new VirtualProperty('IS TURTLE', 'name like "%Turtle%"');
+				return new ComputedValue('IS TURTLE', 'name like "%Turtle%"');
 			}
 
 		}
@@ -1246,8 +1267,8 @@
 						return ColumnManager;
 					case LaneTypes.CONSTRAINTS:
 						return ConstraintManager;
-					case LaneTypes.VIRTUAL_PROPERTIES:
-						return VirtualPropertyManager;
+					case LaneTypes.COMPUTED_VALUES:
+						return ComputedValueManager;
                     default:
                     	throw "Unknown Lane Type: " + laneName;
                 }
@@ -1269,8 +1290,8 @@
 						return RelationManager;
 					case ObjectType.CONSTRAINT:
 						return ConstraintManager;
-					case ObjectType.VIRTUAL_PROPERTY:
-						return VirtualPropertyManager;
+					case ObjectType.COMPUTED_VALUES:
+						return ComputedValueManager;
                     default:
 						console.log(objectType);
 						throw "Unknown Class to create factory for";
